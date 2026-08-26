@@ -630,16 +630,18 @@ func (h *AuthHandler) PasskeyRemove(c *gin.Context) {
 
 // OAuthProviders GET /api/v1/auth/oauth/providers —— 可用第三方登录渠道
 func (h *AuthHandler) OAuthProviders(c *gin.Context) {
-	if !h.oauthSvc.Enabled() {
+	providers, err := h.oauthSvc.ListProviders()
+	if err != nil {
+		// 平台不可达时返回空列表，登录页据此隐藏第三方入口
 		c.JSON(http.StatusOK, envelope.OK(gin.H{"enabled": false, "providers": []any{}}))
 		return
 	}
-	providers, err := h.oauthSvc.ListProviders()
-	if err != nil {
-		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
-		return
+	// allowed 标记管理端是否勾选该渠道；前端据此决定是否展示
+	for _, p := range providers {
+		name, _ := p["name"].(string)
+		p["allowed"] = h.oauthSvc.ProviderEnabled(name)
 	}
-	c.JSON(http.StatusOK, envelope.OK(gin.H{"enabled": true, "providers": providers}))
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"enabled": h.oauthSvc.Enabled(), "providers": providers}))
 }
 
 // OAuthAuthorize GET /api/v1/auth/oauth/authorize?type=gitee —— 获取授权跳转地址
@@ -651,6 +653,10 @@ func (h *AuthHandler) OAuthAuthorize(c *gin.Context) {
 	}
 	if !h.oauthSvc.Enabled() {
 		writeEnvelopeError(c, envelope.CodeBadRequest, "第三方登录未启用")
+		return
+	}
+	if !h.oauthSvc.ProviderEnabled(oauthType) {
+		writeEnvelopeError(c, envelope.CodeForbidden, "该登录渠道未启用")
 		return
 	}
 	siteURL := strings.TrimRight(h.settingsSvc.Get("site_url", h.authSvc.Cfg().Storage.BaseURL), "/")
@@ -681,7 +687,7 @@ func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 		fail(err.Error())
 		return
 	}
-	user, err := h.authSvc.FindOrCreateOAuthUser(info.Type, info.OpenID, info.Nickname, info.Email, info.Avatar)
+	user, _, err := h.authSvc.FindOrCreateOAuthUser(info.Type, info.OpenID, info.Nickname, info.Email, info.Avatar, h.oauthSvc.AutoCreate())
 	if err != nil {
 		fail(err.Error())
 		return
@@ -698,4 +704,87 @@ func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 	}
 	// 令牌放 URL fragment（#），不会发往服务器，也不进浏览器历史
 	c.Redirect(http.StatusFound, siteURL+"/oauth/callback#access="+accessToken+"&refresh="+session.RefreshToken)
+}
+
+// OAuthBindAuthorize GET /api/v1/auth/oauth/bind-authorize?type=gitee —— 登录用户发起第三方绑定
+// 绑定凭证放在回调路径（OauthGo 按域名白名单放行，且回调会在 redirect_uri 后直接拼 ?type=..&code=..，
+// 因此不能往 redirect_uri 加 query 参数，改用 /oauth/callback/bind/:token 路径）。
+func (h *AuthHandler) OAuthBindAuthorize(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	oauthType := c.Query("type")
+	if oauthType == "" {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "missing type")
+		return
+	}
+	if !h.oauthSvc.Enabled() {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "第三方登录未启用")
+		return
+	}
+	if !h.oauthSvc.ProviderEnabled(oauthType) {
+		writeEnvelopeError(c, envelope.CodeForbidden, "该登录渠道未启用")
+		return
+	}
+	token, err := h.oauthSvc.CreateBindIntent(user.ID, oauthType)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	siteURL := strings.TrimRight(h.settingsSvc.Get("site_url", h.authSvc.Cfg().Storage.BaseURL), "/")
+	redirectURI := siteURL + "/api/v1/auth/oauth/callback/bind/" + token
+	authURL, err := h.oauthSvc.GetAuthURL(oauthType, redirectURI)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"url": authURL}))
+}
+
+// OAuthBindCallback GET /api/v1/auth/oauth/callback/bind/:token —— 绑定流程授权回调
+// 绑定成功后重定向回前端 /oauth/callback?result=success&action=bind。
+func (h *AuthHandler) OAuthBindCallback(c *gin.Context) {
+	token := c.Param("token")
+	oauthType := c.Query("type")
+	code := c.Query("code")
+	siteURL := strings.TrimRight(h.settingsSvc.Get("site_url", h.authSvc.Cfg().Storage.BaseURL), "/")
+	fail := func(msg string) {
+		c.Redirect(http.StatusFound, siteURL+"/oauth/callback?result=fail&message="+url.QueryEscape(msg))
+	}
+	userID, expectedType, ok := h.oauthSvc.ConsumeBindIntent(token)
+	if !ok || oauthType == "" || oauthType != expectedType {
+		fail("绑定链接无效或已过期，请重新发起绑定")
+		return
+	}
+	if !h.oauthSvc.Enabled() || code == "" {
+		fail("第三方登录未启用或回调参数缺失")
+		return
+	}
+	info, err := h.oauthSvc.GetUserInfo(oauthType, code)
+	if err != nil {
+		fail(err.Error())
+		return
+	}
+	if _, err := h.authSvc.BindOAuthUser(userID, info.Type, info.OpenID, info.Nickname, info.Email, info.Avatar); err != nil {
+		fail(err.Error())
+		return
+	}
+	c.Redirect(http.StatusFound, siteURL+"/oauth/callback?result=success&action=bind")
+}
+
+// OAuthUnbind POST /api/v1/auth/oauth/unbind —— 解绑当前用户的第三方账号
+func (h *AuthHandler) OAuthUnbind(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	updated, err := h.authSvc.UnbindOAuthUser(user.ID)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"user": updated}))
 }

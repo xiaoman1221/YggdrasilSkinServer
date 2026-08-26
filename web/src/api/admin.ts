@@ -6,6 +6,7 @@ export interface SiteSettings {
   site_name: string
   site_announcement: string
   site_url: string
+  auth_bg_images: string
   allow_register: string
   allow_upload: string
   max_upload_size_mb: string
@@ -31,6 +32,8 @@ export interface SiteSettings {
   oauthgo_api_base: string
   oauthgo_app_id: string
   oauthgo_app_key: string
+  oauthgo_providers: string
+  oauthgo_auto_create: string
   captcha_policy: string
 }
 

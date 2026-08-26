@@ -1059,6 +1059,7 @@ body {
   align-items: center;
   gap: 14px;
   padding: 10px 0;
+  min-width: 0;
   border-bottom: 1px solid var(--line);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1068,9 +1069,15 @@ body {
 
 .auth-aside .ep li .m {
   min-width: 44px;
+  flex: none;
   font-size: 10px;
   letter-spacing: 0.1em;
   color: var(--accent-deep);
+}
+
+.auth-aside .ep li span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .auth-aside .foot {
@@ -1080,6 +1087,37 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-3);
+}
+
+.auth-aside.auth-aside--bg {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+}
+
+.auth-aside.auth-aside--bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(9, 11, 18, 0.55), rgba(9, 11, 18, 0.35));
+  z-index: 0;
+}
+
+.auth-aside.auth-aside--bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-aside.auth-aside--bg .wordmark {
+  color: #fff;
+}
+
+.auth-aside.auth-aside--bg .tagline {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.auth-aside.auth-aside--bg .foot {
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .auth-main {
@@ -1117,18 +1155,29 @@ body {
   gap: 16px;
 }
 
-.auth-form .switch {
+.auth-form .auth-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
   text-align: center;
   font-size: 13px;
   color: var(--text-3);
 }
 
-.auth-form .switch a {
+.auth-form .auth-switch a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 10px;
   color: var(--accent-deep);
   text-decoration: none;
 }
 
-.auth-form .switch a:hover {
+.auth-form .auth-switch a:hover {
   text-decoration: underline;
 }
 

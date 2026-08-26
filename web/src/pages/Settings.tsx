@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Smartphone } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
-import { authApi, PasskeyCredential, SessionInfo } from '../api/auth'
+import { authApi, OAuthProvider, PasskeyCredential, SessionInfo } from '../api/auth'
 import { assetUrl } from '../utils/format'
 import { createPasskey } from '../lib/webauthn'
 import { useToast } from '../components/Toast'
@@ -29,6 +29,9 @@ export default function Settings() {
   const [passkeys, setPasskeys] = useState<PasskeyCredential[]>([])
   const [passkeyLoading, setPasskeyLoading] = useState(true)
   const [passkeyBusy, setPasskeyBusy] = useState(false)
+  const [oauthProviders, setOauthProviders] = useState<OAuthProvider[]>([])
+  const [oauthLoading, setOauthLoading] = useState(true)
+  const [oauthBusy, setOauthBusy] = useState(false)
 
   const refreshToken = localStorage.getItem('yss_refresh_token') || ''
 
@@ -63,6 +66,49 @@ export default function Settings() {
   useEffect(() => {
     loadPasskeys()
   }, [loadPasskeys])
+
+  const loadOauthProviders = useCallback(async () => {
+    setOauthLoading(true)
+    try {
+      const res = await authApi.oauthProviders()
+      setOauthProviders(res.enabled ? (res.providers || []).filter((p) => p.allowed !== false) : [])
+    } catch {
+      /* ignore */
+    } finally {
+      setOauthLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadOauthProviders()
+  }, [loadOauthProviders])
+
+  async function bindOauth(type: string) {
+    setOauthBusy(true)
+    try {
+      const res = await authApi.oauthBindAuthorize(type)
+      window.location.href = res.url
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '获取授权地址失败', 'err')
+    } finally {
+      setOauthBusy(false)
+    }
+  }
+
+  async function unbindOauth() {
+    if (!user?.oauth_type) return
+    if (!window.confirm(`确认解除「${user.oauth_type}」绑定？解除后将不能再用该渠道直接登录本站。`)) return
+    setOauthBusy(true)
+    try {
+      await authApi.oauthUnbind()
+      await refreshUser()
+      toast.show('已解除绑定', 'ok')
+    } catch (err: any) {
+      toast.show(err?.message || '解绑失败', 'err')
+    } finally {
+      setOauthBusy(false)
+    }
+  }
 
   async function registerPasskey() {
     setPasskeyBusy(true)
@@ -271,6 +317,61 @@ export default function Settings() {
               修改成功后所有登录会话将失效，需要重新登录。
             </p>
           </div>
+        </div>
+      </Panel>
+
+      <Panel title="第三方登录">
+        <div className="panel-body">
+          <p className="hint" style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--text-3)' }}>
+            绑定第三方账号后，可用它快捷登录本站。
+          </p>
+          {oauthLoading ? (
+            <Spinner label="加载第三方登录渠道" />
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '10px 12px',
+                  border: '1px solid var(--line)',
+                  borderRadius: 10,
+                  background: 'var(--bg-muted)',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, color: 'var(--text)' }}>
+                    {user?.oauth_type ? `已绑定 ${user.oauth_type}` : '未绑定第三方账号'}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    {user?.oauth_type ? '已可通过该渠道快捷登录本站' : '绑定后可用第三方账号一键登录'}
+                  </div>
+                </div>
+                {user?.oauth_type ? (
+                  <Button size="sm" variant="ghost" disabled={oauthBusy} onClick={unbindOauth}>
+                    解绑
+                  </Button>
+                ) : null}
+              </div>
+              {oauthProviders.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {oauthProviders.map((p) => {
+                    const isBound = user?.oauth_type === p.name
+                    return (
+                      <Button key={p.name} size="sm" disabled={oauthBusy || isBound} onClick={() => bindOauth(p.name)}>
+                        {isBound ? `已绑定 ${p.display_name || p.name}` : `绑定 ${p.display_name || p.name}`}
+                      </Button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
+                  第三方登录未启用，或站点未配置可用渠道。
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </Panel>
 

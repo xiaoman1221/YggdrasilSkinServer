@@ -28,6 +28,8 @@ var (
 	ErrInvalidEmail       = errors.New("invalid email address")
 	ErrEmailExists        = errors.New("email already exists")
 	ErrWrongPassword      = errors.New("current password is incorrect")
+	ErrOAuthBound         = errors.New("该第三方账号已绑定其他账号")
+	ErrOAuthNotFound      = errors.New("该第三方账号尚未绑定本站账号")
 	ErrEmailNotFound      = errors.New("no user found with this email")
 	ErrInvalidResetToken  = errors.New("invalid or expired reset token")
 	ErrSessionNotFound    = errors.New("session not found")
@@ -441,36 +443,47 @@ func (s *AuthService) AdminUpdateUser(userID uint, username, email, newPassword 
 	return &user, nil
 }
 
-// FindOrCreateOAuthUser 按 (type, openid) 查找绑定的用户；未绑定时创建新账号。
+// FindOrCreateOAuthUser 按 (type, openid) 查找绑定的用户；
+// 未绑定时按邮箱匹配已有账号；仍无匹配时，若 autoCreate 为 true 则创建新账号，否则返回 ErrOAuthNotFound。
 // avatar 为第三方平台头像地址（可为空），新账号或尚未设置头像的账号会使用它。
-func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, avatar string) (*model.User, error) {
-	var user model.User
-	err := s.db.Where("oauth_type = ? AND oauth_openid = ?", oauthType, openid).First(&user).Error
-	if err == nil {
-		if user.AvatarURL == "" && avatar != "" {
-			user.AvatarURL = avatar
-			if err := s.db.Save(&user).Error; err != nil {
-				return nil, err
+// 返回值 created 表示本次调用实际创建了新账号。
+func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, avatar string, autoCreate bool) (user *model.User, created bool, err error) {
+	var found model.User
+	queryErr := s.db.Where("oauth_type = ? AND oauth_openid = ?", oauthType, openid).First(&found).Error
+	if queryErr == nil {
+		if found.AvatarURL == "" && avatar != "" {
+			found.AvatarURL = avatar
+			if err := s.db.Save(&found).Error; err != nil {
+				return nil, false, err
 			}
 		}
-		return &user, nil
+		return &found, false, nil
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+	if !errors.Is(queryErr, gorm.ErrRecordNotFound) {
+		return nil, false, queryErr
 	}
 	// 未绑定：优先按邮箱匹配已有账号
 	if email != "" {
-		if err := s.db.Where("email = ?", strings.ToLower(email)).First(&user).Error; err == nil {
-			user.OAuthType = oauthType
-			user.OAuthOpenID = openid
-			if user.AvatarURL == "" {
-				user.AvatarURL = avatar
+		if err := s.db.Where("email = ?", strings.ToLower(email)).First(&found).Error; err == nil {
+			// 邮箱已属于其它已绑定 OAuth 的账号：不再自动绑定，避免静默覆盖
+			if found.OAuthType != "" && found.OAuthType != oauthType {
+				return nil, false, ErrOAuthBound
 			}
-			if err := s.db.Save(&user).Error; err != nil {
-				return nil, err
+			found.OAuthType = oauthType
+			found.OAuthOpenID = openid
+			if found.AvatarURL == "" {
+				found.AvatarURL = avatar
 			}
-			return &user, nil
+			if err := s.db.Save(&found).Error; err != nil {
+				return nil, false, err
+			}
+			return &found, false, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, err
 		}
+	}
+	if !autoCreate {
+		return nil, false, ErrOAuthNotFound
 	}
 	// 创建新账号：邮箱为必填唯一字段，第三方未提供时使用占位邮箱
 	username := strings.TrimSpace(nickname)
@@ -482,7 +495,7 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, 
 	}
 	hash, err := util.HashPassword(util.RandomToken())
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	// 用户名冲突时追加随机后缀
 	for i := 0; i < 5; i++ {
@@ -503,9 +516,55 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, 
 		AvatarURL:    avatar,
 	}
 	if err := s.db.Create(newUser).Error; err != nil {
+		return nil, false, err
+	}
+	return newUser, true, nil
+}
+
+// BindOAuthUser 把第三方账号绑定到指定本站用户。
+// 目标第三方账号已绑定其他用户时返回 ErrOAuthBound。
+func (s *AuthService) BindOAuthUser(userID uint, oauthType, openid, nickname, email, avatar string) (*model.User, error) {
+	var owner model.User
+	err := s.db.Where("oauth_type = ? AND oauth_openid = ?", oauthType, openid).First(&owner).Error
+	if err == nil {
+		if owner.ID == userID {
+			return &owner, nil // 已绑定到同一用户，视为成功
+		}
+		return nil, ErrOAuthBound
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	return newUser, nil
+	var user model.User
+	if err := s.db.First(&user, userID).Error; err != nil {
+		return nil, ErrUserNotFound
+	}
+	user.OAuthType = oauthType
+	user.OAuthOpenID = openid
+	if user.AvatarURL == "" && avatar != "" {
+		user.AvatarURL = avatar
+	}
+	if err := s.db.Save(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// UnbindOAuthUser 解除当前用户的第三方绑定。
+func (s *AuthService) UnbindOAuthUser(userID uint) (*model.User, error) {
+	var user model.User
+	if err := s.db.First(&user, userID).Error; err != nil {
+		return nil, ErrUserNotFound
+	}
+	if user.OAuthType == "" && user.OAuthOpenID == "" {
+		return &user, nil // 未绑定，视为成功
+	}
+	user.OAuthType = ""
+	user.OAuthOpenID = ""
+	if err := s.db.Save(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func min(a, b int) int {

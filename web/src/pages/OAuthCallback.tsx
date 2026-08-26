@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
+import AuthAside from '../components/AuthAside'
 
 /**
  * OauthGo 授权回调落地页。
@@ -11,6 +12,7 @@ export default function OAuthCallback() {
   const navigate = useNavigate()
   const { refreshUser } = useAuth()
   const [error, setError] = useState('')
+  const [bound, setBound] = useState(false)
   const handled = useRef(false)
 
   useEffect(() => {
@@ -19,6 +21,10 @@ export default function OAuthCallback() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('result') === 'fail') {
       setError(params.get('message') || '第三方登录失败')
+      return
+    }
+    if (params.get('result') === 'success' && params.get('action') === 'bind') {
+      setBound(true)
       return
     }
     const frag = new URLSearchParams(window.location.hash.replace(/^#/, ''))
@@ -37,22 +43,32 @@ export default function OAuthCallback() {
 
   return (
     <div className="split-auth">
-      <aside className="auth-aside">
-        <div>
-          <div className="wordmark">YSS</div>
-          <p className="tagline">第三方登录</p>
-        </div>
-        <div className="foot">YggdrasilSkinServer</div>
-      </aside>
+      <AuthAside tagline="第三方登录" />
       <main className="auth-main">
         <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
-          {error ? (
+          {bound ? (
+            <div>
+              <h1>绑定成功</h1>
+              <p className="hint">第三方账号已绑定到当前用户。</p>
+              <p className="auth-switch">
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    navigate('/settings', { replace: true })
+                  }}
+                >
+                  返回个人设置
+                </a>
+              </p>
+            </div>
+          ) : error ? (
             <>
               <div>
                 <h1>登录失败</h1>
                 <p className="hint">{error}</p>
               </div>
-              <p className="switch">
+              <p className="auth-switch">
                 <a
                   href="#"
                   onClick={(e) => {

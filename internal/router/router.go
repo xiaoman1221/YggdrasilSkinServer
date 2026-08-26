@@ -188,6 +188,9 @@ func registerV1Routes(
 		auth.GET("/oauth/providers", authHandler.OAuthProviders)
 		auth.GET("/oauth/authorize", authHandler.OAuthAuthorize)
 		auth.GET("/oauth/callback", authHandler.OAuthCallback)
+		auth.GET("/oauth/callback/bind/:token", authHandler.OAuthBindCallback)
+		auth.GET("/oauth/bind-authorize", middleware.AuthRequired(cfg), authHandler.OAuthBindAuthorize)
+		auth.POST("/oauth/unbind", middleware.AuthRequired(cfg), authHandler.OAuthUnbind)
 		// Passkey / WebAuthn 通行密钥登录
 		auth.POST("/passkey/login/begin", authHandler.PasskeyBeginLogin)
 		auth.POST("/passkey/login/finish", authHandler.PasskeyFinishLogin)

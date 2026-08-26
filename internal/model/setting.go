@@ -11,9 +11,11 @@ type Setting struct {
 
 // 站点设置键（可在管理端「站点设置」修改，覆盖环境变量）。
 const (
-	SettingSiteName           = "site_name"
-	SettingSiteAnnouncement   = "site_announcement"
-	SettingSiteURL            = "site_url" // 对外地址，替代 YSS_STORAGE_BASE_URL
+	SettingSiteName         = "site_name"
+	SettingSiteAnnouncement = "site_announcement"
+	SettingSiteURL          = "site_url" // 对外地址，替代 YSS_STORAGE_BASE_URL
+	// SettingAuthBgImages 登录/注册等认证页随机背景图（JSON 数组字符串，每项为图片 URL）
+	SettingAuthBgImages       = "auth_bg_images"
 	SettingAllowRegister      = "allow_register"
 	SettingAllowUpload        = "allow_upload"
 	SettingMaxUploadSizeMB    = "max_upload_size_mb"
@@ -43,6 +45,10 @@ const (
 	SettingOauthAPIBase = "oauthgo_api_base" // 默认 https://o.1v.fit
 	SettingOauthAppID   = "oauthgo_app_id"
 	SettingOauthAppKey  = "oauthgo_app_key"
+	// SettingOauthProviders 允许的登录渠道（JSON 数组字符串，如 ["gitee","qq"]；空表示全部启用）
+	SettingOauthProviders = "oauthgo_providers"
+	// SettingOauthAutoCreate 未绑定的第三方账号是否自动创建本站账号（true/false）
+	SettingOauthAutoCreate = "oauthgo_auto_create"
 
 	// 图形验证码策略：off 关闭 / always 登录注册始终需要 / after_failed 连续登录失败后需要
 	SettingCaptchaPolicy = "captcha_policy"
@@ -63,6 +69,7 @@ func DefaultSettings() map[string]string {
 		SettingSiteName:           "YSS 皮肤站",
 		SettingSiteAnnouncement:   "",
 		SettingSiteURL:            "",
+		SettingAuthBgImages:       "",
 		SettingAllowRegister:      "true",
 		SettingAllowUpload:        "true",
 		SettingMaxUploadSizeMB:    "4",
@@ -88,6 +95,8 @@ func DefaultSettings() map[string]string {
 		SettingOauthAPIBase:       "https://o.1v.fit",
 		SettingOauthAppID:         "",
 		SettingOauthAppKey:        "",
+		SettingOauthProviders:     "",
+		SettingOauthAutoCreate:    "true",
 		SettingCaptchaPolicy:      "off",
 	}
 }

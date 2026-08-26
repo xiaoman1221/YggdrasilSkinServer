@@ -6,6 +6,7 @@ export interface SiteInfo {
   allow_register: boolean
   allow_upload: boolean
   mojang_enabled: boolean
+  auth_bg_images: string[]
 }
 
 export const siteApi = {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Box, Download, Flag, Pencil, Save, Shield, Trash2 } from 'lucide-react'
 import { adminApi, AdminProfile, AdminTexture, AdminUser, AdminYsmModel, SiteSettings, TextureReport } from '../api/admin'
+import { authApi, OAuthProvider } from '../api/auth'
 import { LibraryItem } from '../api/library'
 import { downloadYsmFile } from '../api/profile'
 import { formatSize } from '../utils/format'
@@ -25,6 +26,41 @@ import {
 import type { Column } from '../components/ui'
 
 const PAGE_SIZE = 15
+
+// parseBgImages 把后台存储的 JSON 数组（或逗号/换行分隔文本）解析为 URL 列表。
+function parseBgImages(raw: string): string[] {
+  const t = (raw || '').trim()
+  if (!t) return []
+  try {
+    const arr = JSON.parse(t)
+    if (Array.isArray(arr)) return arr.map((s) => String(s).trim()).filter(Boolean)
+  } catch {
+    /* fall through */
+  }
+  return t
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+// parseProviderNames 解析 oauthgo_providers 设置（JSON 数组字符串）。
+function parseProviderNames(raw: string): string[] {
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter((s): s is string => typeof s === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+// toggleProvider 在 JSON 数组字符串中增删一个渠道名。
+function toggleProvider(raw: string, name: string): string {
+  const set = new Set(parseProviderNames(raw))
+  if (set.has(name)) set.delete(name)
+  else set.add(name)
+  return JSON.stringify([...set])
+}
 
 type Tab = 'settings' | 'users' | 'profiles' | 'textures' | 'ysm' | 'library'
 
@@ -90,6 +126,7 @@ const emptySettings: SiteSettings = {
   site_name: '',
   site_announcement: '',
   site_url: '',
+  auth_bg_images: '',
   allow_register: 'true',
   allow_upload: 'true',
   max_upload_size_mb: '4',
@@ -115,6 +152,8 @@ const emptySettings: SiteSettings = {
   oauthgo_api_base: 'https://o.1v.fit',
   oauthgo_app_id: '',
   oauthgo_app_key: '',
+  oauthgo_providers: '',
+  oauthgo_auto_create: 'true',
   captcha_policy: 'off',
 }
 
@@ -123,12 +162,17 @@ function SettingsTab() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<SiteSettings>(emptySettings)
+  const [providers, setProviders] = useState<OAuthProvider[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await adminApi.getSettings()
       setForm({ ...emptySettings, ...res.settings })
+      authApi
+        .oauthProviders()
+        .then((r) => setProviders(r.providers || []))
+        .catch(() => setProviders([]))
     } catch (err: any) {
       toast.show(err.message || '加载设置失败', 'err')
     } finally {
@@ -167,6 +211,7 @@ function SettingsTab() {
         site_name: form.site_name.trim() || 'YSS',
         site_announcement: form.site_announcement,
         site_url: form.site_url.trim(),
+        auth_bg_images: JSON.stringify(parseBgImages(form.auth_bg_images)),
         allow_register: String(form.allow_register === 'true'),
         allow_upload: String(form.allow_upload === 'true'),
         max_upload_size_mb: String(Math.max(1, parseInt(form.max_upload_size_mb, 10) || 4)),
@@ -192,6 +237,10 @@ function SettingsTab() {
         oauthgo_api_base: form.oauthgo_api_base.trim() || 'https://o.1v.fit',
         oauthgo_app_id: form.oauthgo_app_id.trim(),
         oauthgo_app_key: form.oauthgo_app_key,
+        oauthgo_providers: parseProviderNames(form.oauthgo_providers).length
+          ? JSON.stringify(parseProviderNames(form.oauthgo_providers))
+          : '',
+        oauthgo_auto_create: String(form.oauthgo_auto_create !== 'false'),
         captcha_policy: form.captcha_policy || 'off',
       })
       setForm({ ...emptySettings, ...res.settings })
@@ -219,6 +268,18 @@ function SettingsTab() {
           </div>
           <Field label="站点公告" hint="显示在控制台顶部">
             <Textarea value={form.site_announcement} onChange={(e) => set('site_announcement', e.target.value)} placeholder="欢迎使用 YSS 皮肤站……" />
+          </Field>
+          <Field
+            label="认证页随机背景图"
+            hint="每行一个图片 URL；登录/注册/找回密码等页面会随机展示其中一张"
+          >
+            <Textarea
+              className="mono"
+              value={parseBgImages(form.auth_bg_images).join('\n')}
+              onChange={(e) => set('auth_bg_images', e.target.value)}
+              placeholder={'https://example.com/bg1.png\nhttps://example.com/bg2.jpg'}
+              rows={4}
+            />
           </Field>
         </div>
       </Panel>
@@ -400,6 +461,47 @@ function SettingsTab() {
             <Field label="回调地址（只读）" hint="需加入 OauthGo 应用白名单">
               <Input className="mono" readOnly value={`${form.site_url.trim() || 'https://你的站点'}/api/v1/auth/oauth/callback`} />
             </Field>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 14, color: 'var(--text)' }}>自动创建账号</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>关闭后，未绑定本站账号的第三方登录会提示先到个人中心绑定</div>
+            </div>
+            <Switch checked={form.oauthgo_auto_create !== 'false'} onChange={(v) => set('oauthgo_auto_create', String(v))} />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>支持的登录方式</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>勾选允许使用的渠道；全部不勾选时默认允许平台所有渠道</div>
+            {providers.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {providers.map((p) => {
+                  const checked = parseProviderNames(form.oauthgo_providers).includes(p.name)
+                  return (
+                    <button
+                      key={p.name}
+                      type="button"
+                      onClick={() => set('oauthgo_providers', toggleProvider(form.oauthgo_providers, p.name))}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        border: '1px solid var(--line)',
+                        background: checked ? 'var(--accent-soft)' : 'transparent',
+                        color: checked ? 'var(--accent-deep)' : 'var(--text-2)',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                      }}
+                    >
+                      {checked ? '✓ ' : ''}
+                      {p.display_name || p.name}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
+                无法获取渠道列表：请确认 API 地址可访问（保存设置后自动重试）。
+              </p>
+            )}
           </div>
         </div>
       </Panel>

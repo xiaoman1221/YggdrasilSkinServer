@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { authApi } from '../api/auth'
 import { Button, Field, Input } from '../components/ui'
+import AuthAside from '../components/AuthAside'
 import { useToast } from '../components/Toast'
 
 export default function ResetPassword() {
@@ -42,13 +43,7 @@ export default function ResetPassword() {
 
   return (
     <div className="split-auth">
-      <aside className="auth-aside">
-        <div>
-          <div className="wordmark">YSS</div>
-          <p className="tagline">设置新密码。</p>
-        </div>
-        <div className="foot">YggdrasilSkinServer</div>
-      </aside>
+      <AuthAside tagline="设置新密码。" />
       <main className="auth-main">
         {done ? (
           <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
@@ -56,7 +51,7 @@ export default function ResetPassword() {
               <h1>重置成功</h1>
               <p className="hint">密码已更新，即将跳转到登录页……</p>
             </div>
-            <p className="switch">
+            <p className="auth-switch">
               <Link to="/login">前往登录</Link>
             </p>
           </form>
@@ -77,7 +72,7 @@ export default function ResetPassword() {
                 {busy ? '提交中…' : '重置密码'}
               </Button>
             </div>
-            <p className="switch">
+            <p className="auth-switch">
               <Link to="/login">返回登录</Link>
             </p>
           </form>

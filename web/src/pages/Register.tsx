@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
+import { authApi, OAuthProvider } from '../api/auth'
 import { captchaApi } from '../api/captcha'
 import { Button, Field, Input } from '../components/ui'
+import AuthAside from '../components/AuthAside'
 import CaptchaField, { CaptchaValue } from '../components/CaptchaField'
 import { useToast } from '../components/Toast'
 
@@ -17,6 +19,7 @@ export default function Register() {
   const [busy, setBusy] = useState(false)
   const [captchaRequired, setCaptchaRequired] = useState(false)
   const [captcha, setCaptcha] = useState<CaptchaValue>({ id: '', image: '', code: '' })
+  const [oauth, setOauth] = useState<OAuthProvider[]>([])
 
   useEffect(() => {
     captchaApi
@@ -28,6 +31,12 @@ export default function Register() {
         }
       })
       .catch(() => {})
+    authApi
+      .oauthProviders()
+      .then((res) => {
+        if (res.enabled) setOauth((res.providers || []).filter((p) => p.allowed !== false))
+      })
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -37,6 +46,15 @@ export default function Register() {
       setCaptcha((prev) => ({ ...prev, id: res.id, image: res.image, code: '' }))
     } catch {
       /* ignore */
+    }
+  }
+
+  async function oauthLogin(type: string) {
+    try {
+      const res = await authApi.oauthAuthorize(type)
+      window.location.href = res.url
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '获取授权地址失败', 'err')
     }
   }
 
@@ -78,27 +96,7 @@ export default function Register() {
 
   return (
     <div className="split-auth">
-      <aside className="auth-aside">
-        <div>
-          <div className="wordmark">YSS</div>
-          <p className="tagline">创建一个站点账号，开始管理你的 Minecraft 档案与皮肤。</p>
-          <ul className="ep">
-            <li>
-              <span className="m">POST</span>
-              <span>/api/v1/auth/register</span>
-            </li>
-            <li>
-              <span className="m">POST</span>
-              <span>/api/v1/auth/login</span>
-            </li>
-            <li>
-              <span className="m">GET</span>
-              <span>/api/yggdrasil</span>
-            </li>
-          </ul>
-        </div>
-        <div className="foot">YggdrasilSkinServer · authlib-injector compatible</div>
-      </aside>
+      <AuthAside tagline="创建一个站点账号，开始管理你的 Minecraft 档案与皮肤。" />
 
       <main className="auth-main">
         <form className="auth-form" onSubmit={onSubmit}>
@@ -140,8 +138,20 @@ export default function Register() {
               注册
               <ArrowRight size={16} strokeWidth={1.5} />
             </Button>
+            {oauth.length > 0 ? (
+              <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
+                <span className="field-label">第三方快捷登录</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {oauth.map((p) => (
+                    <Button key={p.name} size="sm" onClick={() => oauthLogin(p.name)}>
+                      {p.display_name || p.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
-          <p className="switch">
+          <p className="auth-switch">
             已有账号？<Link to="/login">登录</Link>
           </p>
         </form>

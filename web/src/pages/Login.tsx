@@ -2,20 +2,13 @@ import { useEffect, useState } from 'react'
 import { ArrowRight, KeyRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
-import { authApi } from '../api/auth'
+import { authApi, OAuthProvider } from '../api/auth'
 import { captchaApi } from '../api/captcha'
 import { Button, Field, Input } from '../components/ui'
+import AuthAside from '../components/AuthAside'
 import CaptchaField, { CaptchaValue } from '../components/CaptchaField'
 import { useToast } from '../components/Toast'
 import { getPasskey } from '../lib/webauthn'
-
-const endpoints: [string, string][] = [
-  ['POST', '/api/yggdrasil/authserver/authenticate'],
-  ['POST', '/api/yggdrasil/authserver/refresh'],
-  ['POST', '/api/yggdrasil/authserver/validate'],
-  ['GET', '/api/yggdrasil/sessionserver/session/minecraft/profile/{uuid}'],
-  ['POST', '/api/yggdrasil/api/profiles/minecraft'],
-]
 
 export default function Login() {
   const { login, refreshUser } = useAuth()
@@ -24,7 +17,7 @@ export default function Login() {
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [oauth, setOauth] = useState<{ name: string; display_name?: string }[]>([])
+  const [oauth, setOauth] = useState<OAuthProvider[]>([])
   const [captchaPolicy, setCaptchaPolicy] = useState('off')
   const [captchaRequired, setCaptchaRequired] = useState(false)
   const [captcha, setCaptcha] = useState<CaptchaValue>({ id: '', image: '', code: '' })
@@ -33,7 +26,7 @@ export default function Login() {
     authApi
       .oauthProviders()
       .then((res) => {
-        if (res.enabled) setOauth(res.providers || [])
+        if (res.enabled) setOauth((res.providers || []).filter((p) => p.allowed !== false))
       })
       .catch(() => {})
     captchaApi
@@ -120,26 +113,15 @@ export default function Login() {
 
   return (
     <div className="split-auth">
-      <aside className="auth-aside">
-        <div>
-          <div className="wordmark">YSS</div>
-          <p className="tagline">
+      <AuthAside
+        tagline={
+          <>
             自托管 Minecraft 皮肤站与 Yggdrasil 认证服务器。
-          </p>
-          <p className="tagline">
+            <br />
             天上如是，地下亦然。
-          </p>
-          <ul className="ep">
-            {endpoints.map(([m, p]) => (
-              <li key={p}>
-                <span className="m">{m}</span>
-                <span>{p}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="foot">YggdrasilSkinServer · authlib-injector compatible</div>
-      </aside>
+          </>
+        }
+      />
 
       <main className="auth-main">
         <form className="auth-form" onSubmit={onSubmit}>
@@ -190,7 +172,7 @@ export default function Login() {
               </div>
             ) : null}
           </div>
-          <p className="switch" style={{ display: 'flex', justifyContent: 'center', gap: 24 }}>
+          <p className="auth-switch" style={{ display: 'flex', justifyContent: 'center', gap: 24 }}>
             <Link to="/register">注册</Link>
             <Link to="/forgot-password">忘记密码</Link>
           </p>

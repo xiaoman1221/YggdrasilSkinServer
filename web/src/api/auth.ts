@@ -58,6 +58,12 @@ export interface CaptchaPayload {
   captchaCode?: string
 }
 
+export interface OAuthProvider {
+  name: string
+  display_name?: string
+  allowed?: boolean
+}
+
 export const authApi = {
   setup: (payload: { username: string; email: string; password: string }) =>
     request<{ user: User }>({ method: 'POST', url: '/auth/setup', data: payload }),
@@ -149,13 +155,18 @@ export const authApi = {
     request<void>({ method: 'POST', url: '/auth/reset-password', data: { token, password } }),
 
   oauthProviders: () =>
-    request<{ enabled: boolean; providers: { name: string; display_name?: string }[] }>({
+    request<{ enabled: boolean; providers: OAuthProvider[] }>({
       method: 'GET',
       url: '/auth/oauth/providers',
     }),
 
   oauthAuthorize: (type: string) =>
     request<{ url: string }>({ method: 'GET', url: '/auth/oauth/authorize', params: { type } }),
+
+  oauthBindAuthorize: (type: string) =>
+    request<{ url: string }>({ method: 'GET', url: '/auth/oauth/bind-authorize', params: { type } }),
+
+  oauthUnbind: () => request<{ user: User }>({ method: 'POST', url: '/auth/oauth/unbind' }),
 }
 
 

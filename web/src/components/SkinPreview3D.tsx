@@ -21,6 +21,25 @@ function webglSupported(): boolean {
 }
 
 /**
+ * 兼容 three r160+ 与 skinview3d 3.4.2 的版本错配：
+ * skinview3d 的 dispose() 仍访问 ShaderPass 的旧公开字段 fsQuad，
+ * 新版 three 已将其改为私有 _fsQuad，导致卸载时 fsQuad 为 undefined 而崩溃。
+ * 先对齐字段再释放；若仍有内部异常则忽略（renderer.dispose() 已先行释放 GPU 资源）。
+ */
+function disposeViewerSafely(viewer: skinview3d.SkinViewer) {
+  try {
+    const fxaa = viewer.fxaaPass as unknown as {
+      fsQuad?: { dispose: () => void }
+      _fsQuad?: { dispose: () => void }
+    }
+    if (fxaa && !fxaa.fsQuad && fxaa._fsQuad) fxaa.fsQuad = fxaa._fsQuad
+    viewer.dispose()
+  } catch {
+    /* 忽略 skinview3d 内部清理异常 */
+  }
+}
+
+/**
  * 3D 皮肤预览（skinview3d，Blessing Skin Server 同款引擎）。
  * - IntersectionObserver 懒挂载 WebGL
  * - 始终先渲染默认 Steve；远程皮肤加载失败时回退 Steve，避免角色隐形
@@ -103,7 +122,7 @@ export default function SkinPreview3D({
 
     return () => {
       disposed = true
-      viewer.dispose()
+      disposeViewerSafely(viewer)
       viewerRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

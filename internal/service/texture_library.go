@@ -59,7 +59,7 @@ func (s *TextureLibraryService) ListTextures(status, tag, keyword string, limit,
 	}
 
 	var items []model.TextureLibraryItem
-	err := q.Order("created_at DESC").Limit(limit).Offset(offset).Find(&items).Error
+	err := q.Order("texture_library_items.created_at DESC").Limit(limit).Offset(offset).Find(&items).Error
 	return items, total, err
 }
 

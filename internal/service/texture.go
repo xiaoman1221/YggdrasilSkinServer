@@ -92,6 +92,32 @@ func (s *TextureService) Create(userID uint, texType, skinModel string, data []b
 	return texture, nil
 }
 
+// CreateOrReuseSkin 处理皮肤数据并按内容 hash 去重：用户已存在同内容皮肤时直接复用，否则创建。
+// 用于正版认证自动同步官方皮肤，避免重复认证产生重复材质。
+func (s *TextureService) CreateOrReuseSkin(userID uint, skinModel string, data []byte, name, description string) (*model.Texture, error) {
+	maxBytes := int64(s.settings.GetInt(model.SettingMaxUploadSizeMB, 4)) * 1024 * 1024
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("file too large (max %d MB)", maxBytes/1024/1024)
+	}
+	maxWidth := s.settings.GetInt(model.SettingUploadMaxWidth, s.cfg.Upload.MaxWidth)
+	maxHeight := s.settings.GetInt(model.SettingUploadMaxHeight, s.cfg.Upload.MaxHeight)
+	processed, _, _, err := util.ProcessPNG(data, maxWidth, maxHeight)
+	if err != nil {
+		return nil, err
+	}
+	hash := util.HashPNG(processed)
+
+	var existing model.Texture
+	err = s.db.Where("user_id = ? AND type = ? AND hash = ?", userID, model.TextureTypeSkin, hash).First(&existing).Error
+	if err == nil {
+		return &existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	return s.Create(userID, model.TextureTypeSkin, skinModel, data, name, description)
+}
+
 // UpdateMeta 更新材质基础信息（仅允许本人）。
 func (s *TextureService) UpdateMeta(id, ownerID uint, name, description string) error {
 	var texture model.Texture
@@ -159,6 +185,3 @@ func (s *TextureService) AvatarHead(texture *model.Texture) (string, error) {
 	}
 	return s.settings.TextureURL(filename[:len(filename)-4], s.cfg.Storage.BaseURL), nil
 }
-
-
-

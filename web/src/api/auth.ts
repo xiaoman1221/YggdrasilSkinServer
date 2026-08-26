@@ -139,8 +139,12 @@ export const authApi = {
   passkeyRemove: (id: number) =>
     request<void>({ method: 'DELETE', url: `/auth/passkey/credentials/${id}` }),
 
-  mojangAuthorize: () =>
-    request<{ url: string }>({ method: 'GET', url: '/auth/mojang/authorize' }),
+  mojangAuthorize: (profileId?: string) =>
+    request<{ url: string }>({
+      method: 'GET',
+      url: '/auth/mojang/authorize',
+      params: profileId ? { profileId } : undefined,
+    }),
 
   updateProfile: (payload: { username: string; email: string }) =>
     request<{ user: User }>({ method: 'PUT', url: '/auth/profile', data: payload }),

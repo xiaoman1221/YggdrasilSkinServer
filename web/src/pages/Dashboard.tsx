@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Download, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
+import { BadgeCheck, Download, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
 import { profileApi, Profile, textureUrl } from '../api/profile'
 import { siteApi } from '../api/site'
 import { authApi } from '../api/auth'
@@ -136,22 +136,6 @@ export default function Dashboard() {
                   {user?.mojang_uuid ? `${user.mojang_name ?? '未知'} · ${user.mojang_uuid.slice(0, 8)}…` : '未绑定'}
                 </dd>
               </dl>
-              {mojangEnabled ? (
-                <Button
-                  size="sm"
-                  style={{ marginTop: 14 }}
-                  onClick={async () => {
-                    try {
-                      const res = await authApi.mojangAuthorize()
-                      window.location.href = res.url
-                    } catch (err: any) {
-                      toast.show(err?.response?.data?.error?.message || err.message || '获取授权地址失败', 'err')
-                    }
-                  }}
-                >
-                  绑定正版账号
-                </Button>
-              ) : null}
             </div>
           </Panel>
           <Panel title="接入指南">
@@ -186,38 +170,57 @@ export default function Dashboard() {
             <div className="empty">还没有档案，点击右上角「新建档案」创建第一个角色</div>
           ) : (
             <div className="grid">
-              {profiles.map((p) => (
-                <PreviewCard
-                  key={p.uuid}
-                  skinUrl={p.skin_texture ? textureUrl(p.skin_texture.hash) : undefined}
-                  capeUrl={p.cape_texture ? textureUrl(p.cape_texture.hash) : undefined}
-                  slim={p.skin_texture?.model === 'slim'}
-                  title={
-                    <>
-                      <span className="mono">{p.name}</span>
-                      <span style={{ display: 'inline-flex', gap: 6 }}>
-                        {p.skin_texture ? <StatusTag kind="on">皮肤</StatusTag> : null}
-                        {p.cape_texture ? <StatusTag kind="on">披风</StatusTag> : null}
-                        {p.ysm_model ? <StatusTag kind="warn">YSM</StatusTag> : null}
-                      </span>
-                    </>
-                  }
-                  meta={
-                    p.ysm_model
-                      ? `${p.ysm_model.name} · ${p.uuid.slice(0, 8)}…`
-                      : `${p.uuid.slice(0, 8)}…`
-                  }
-                  actions={
-                    <>
-                      <TextLink
-                        onClick={() => {
-                          setRenameTarget(p)
-                          setName(p.name)
-                        }}
-                      >
-                        <Pencil size={13} strokeWidth={1.5} />
-                        改名
-                      </TextLink>
+              {profiles.map((p) => {
+                const premiumSynced = !!(user?.mojang_uuid &&
+                  p.uuid.replace(/-/g, '').toLowerCase() === user.mojang_uuid.replace(/-/g, '').toLowerCase())
+                return (
+                  <PreviewCard
+                    key={p.uuid}
+                    skinUrl={p.skin_texture ? textureUrl(p.skin_texture.hash) : undefined}
+                    capeUrl={p.cape_texture ? textureUrl(p.cape_texture.hash) : undefined}
+                    slim={p.skin_texture?.model === 'slim'}
+                    title={
+                      <>
+                        <span className="mono">{p.name}</span>
+                        <span style={{ display: 'inline-flex', gap: 6 }}>
+                          {premiumSynced ? <StatusTag kind="on">正版</StatusTag> : null}
+                          {p.skin_texture ? <StatusTag kind="on">皮肤</StatusTag> : null}
+                          {p.cape_texture ? <StatusTag kind="on">披风</StatusTag> : null}
+                          {p.ysm_model ? <StatusTag kind="warn">YSM</StatusTag> : null}
+                        </span>
+                      </>
+                    }
+                    meta={
+                      p.ysm_model
+                        ? `${p.ysm_model.name} · ${p.uuid.slice(0, 8)}…`
+                        : `${p.uuid.slice(0, 8)}…`
+                    }
+                    actions={
+                      <>
+                        {mojangEnabled ? (
+                          <TextLink
+                            onClick={async () => {
+                              try {
+                                const res = await authApi.mojangAuthorize(p.uuid)
+                                window.location.href = res.url
+                              } catch (err: any) {
+                                toast.show(err?.response?.data?.error?.message || err.message || '获取授权地址失败', 'err')
+                              }
+                            }}
+                          >
+                            <BadgeCheck size={13} strokeWidth={1.5} />
+                            正版认证
+                          </TextLink>
+                        ) : null}
+                        <TextLink
+                          onClick={() => {
+                            setRenameTarget(p)
+                            setName(p.name)
+                          }}
+                        >
+                          <Pencil size={13} strokeWidth={1.5} />
+                          改名
+                        </TextLink>
                       {p.ysm_model ? (
                         <>
                           <a className="link-btn" href={p.ysm_model.url} download>
@@ -244,10 +247,11 @@ export default function Dashboard() {
                         <Trash2 size={13} strokeWidth={1.5} />
                         删除
                       </TextLink>
-                    </>
-                  }
-                />
-              ))}
+                      </>
+                    }
+                  />
+                )
+              })}
             </div>
           )}
         </div>
@@ -298,4 +302,3 @@ export default function Dashboard() {
     </div>
   )
 }
-

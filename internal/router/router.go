@@ -86,7 +86,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	adminHandler := handler.NewAdminHandler(profileSvc, librarySvc, textureSvc, settingsSvc, mailSvc, authSvc)
 	siteHandler := handler.NewSiteHandler(settingsSvc, mojangSvc)
 	loginRecordHandler := handler.NewLoginRecordHandler(loginRecordSvc)
-	mojangHandler := handler.NewMojangHandler(cfg, mojangSvc, textureSvc)
+	mojangHandler := handler.NewMojangHandler(cfg, mojangSvc, textureSvc, profileSvc)
 	yggHandler := handler.NewYggdrasilHandler(yggSvc)
 
 	registerYggdrasilRoutes(r, yggHandler)

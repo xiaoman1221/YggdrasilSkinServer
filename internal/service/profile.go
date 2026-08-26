@@ -22,6 +22,7 @@ var (
 	ErrInvalidProfileName = errors.New("invalid profile name")
 	ErrTextureNotOwned    = errors.New("texture does not belong to this user")
 	ErrInvalidTextureType = errors.New("invalid texture type")
+	ErrMojangUUIDTaken    = errors.New("该正版账号的 UUID 已绑定本站其它档案")
 )
 
 // ProfileService 负责 Minecraft 档案管理（创建/改名/绑定材质/删除）。
@@ -183,4 +184,33 @@ func (s *ProfileService) Delete(profile *model.Profile, actorID uint) error {
 	WriteAudit(s.db, actorID, "profile.delete", "profile", profile.UUID,
 		"deleted profile "+profile.Name)
 	return nil
+}
+
+// SyncMojangProfile 把正版认证结果同步到档案：更新 UUID 为正版 UUID，并（可选）绑定正版皮肤。
+// 目标 UUID 已被其它档案占用时返回 ErrMojangUUIDTaken；skinTextureID 为 0 时仅同步 UUID。
+func (s *ProfileService) SyncMojangProfile(profile *model.Profile, mojangUUID string, skinTextureID uint, actorID uint) (*model.Profile, error) {
+	normalized := util.NormalizeUUID(mojangUUID)
+	if normalized == "" {
+		return nil, errors.New("invalid mojang uuid")
+	}
+	var count int64
+	s.db.Model(&model.Profile{}).Where("uuid IN ? AND id <> ?", util.UUIDQueryFormats(normalized), profile.ID).Count(&count)
+	if count > 0 {
+		return nil, ErrMojangUUIDTaken
+	}
+	oldUUID := profile.UUID
+	profile.UUID = util.ToHyphenatedUUID(normalized)
+	if skinTextureID > 0 {
+		profile.SkinTextureID = &skinTextureID
+	}
+	if err := s.db.Save(profile).Error; err != nil {
+		return nil, err
+	}
+	// UUID 变更后，绑定旧 UUID 的 Yggdrasil 令牌立即失效，避免身份错乱
+	if oldUUID != profile.UUID {
+		s.db.Delete(&model.Token{}, "profile_id = ?", oldUUID)
+	}
+	WriteAudit(s.db, actorID, "profile.mojang_sync", "profile", profile.UUID,
+		"synced official account uuid "+normalized)
+	return profile, nil
 }

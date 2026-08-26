@@ -1,38 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { BadgeCheck, XCircle } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
-import { Button } from '../components/ui'
-import { authApi } from '../api/auth'
 
 export default function BindMojang() {
   const [params] = useSearchParams()
   const { refreshUser } = useAuth()
-  const [retrying, setRetrying] = useState(false)
-  const [retryError, setRetryError] = useState('')
   const result = params.get('result')
   const message = params.get('message')
   const name = params.get('name')
   const uuid = params.get('uuid')
+  const profileName = params.get('profile')
 
   useEffect(() => {
     if (result === 'success') refreshUser()
   }, [result, refreshUser])
 
   const success = result === 'success'
-
-  async function retry() {
-    setRetryError('')
-    setRetrying(true)
-    try {
-      const res = await authApi.mojangAuthorize()
-      window.location.href = res.url
-    } catch (err: any) {
-      setRetryError(err?.message || '获取绑定跳转失败，请稍后重试')
-    } finally {
-      setRetrying(false)
-    }
-  }
 
   return (
     <div style={{ maxWidth: 520, margin: '0 auto' }}>
@@ -56,11 +40,10 @@ export default function BindMojang() {
                 <dd>{uuid || '—'}</dd>
               </dl>
               <p className="data" style={{ margin: 0, color: 'var(--text-3)' }}>
-                官方皮肤已获取到你的材质仓库，可前往「材质仓库」设为皮肤或头像。
+                官方皮肤已自动同步到档案「{profileName || name || '—'}」，档案 UUID 已更新为正版 UUID。
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <Link to="/wardrobe" className="btn btn-primary">前往材质仓库</Link>
-                <Link to="/" className="btn btn-outline">返回控制台</Link>
+                <Link to="/" className="btn btn-primary">返回控制台</Link>
               </div>
             </>
           ) : (
@@ -70,14 +53,8 @@ export default function BindMojang() {
                 绑定失败
               </p>
               <p className="data" style={{ margin: 0 }}>{message || '未知错误'}</p>
-              {retryError ? (
-                <p className="data" style={{ margin: 0, color: 'var(--danger)' }}>{retryError}</p>
-              ) : null}
               <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <Button onClick={retry} disabled={retrying}>
-                  {retrying ? '跳转中…' : '重新绑定'}
-                </Button>
-                <Link to="/" className="btn btn-outline">返回控制台</Link>
+                <Link to="/" className="btn btn-primary">返回控制台</Link>
               </div>
             </>
           )}

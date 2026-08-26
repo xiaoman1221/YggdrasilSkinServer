@@ -13,6 +13,7 @@ import (
 	"YggdrasilSkinServer/internal/middleware"
 	"YggdrasilSkinServer/internal/model"
 	"YggdrasilSkinServer/internal/service"
+	"YggdrasilSkinServer/internal/util"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -23,14 +24,16 @@ type MojangHandler struct {
 	cfg        *config.Config
 	mojangSvc  *service.MojangService
 	textureSvc *service.TextureService
+	profileSvc *service.ProfileService
 }
 
 // NewMojangHandler 创建 MojangHandler。
-func NewMojangHandler(cfg *config.Config, mojangSvc *service.MojangService, textureSvc *service.TextureService) *MojangHandler {
-	return &MojangHandler{cfg: cfg, mojangSvc: mojangSvc, textureSvc: textureSvc}
+func NewMojangHandler(cfg *config.Config, mojangSvc *service.MojangService, textureSvc *service.TextureService, profileSvc *service.ProfileService) *MojangHandler {
+	return &MojangHandler{cfg: cfg, mojangSvc: mojangSvc, textureSvc: textureSvc, profileSvc: profileSvc}
 }
 
-// Authorize GET /api/v1/auth/mojang/authorize —— 返回 Microsoft 授权地址
+// Authorize GET /api/v1/auth/mojang/authorize?profileId=<uuid> —— 返回 Microsoft 授权地址
+// profileId 指定认证成功后要同步正版皮肤/UUID 的档案，必须是当前用户拥有的档案。
 func (h *MojangHandler) Authorize(c *gin.Context) {
 	user, err := middleware.CurrentUser(c)
 	if err != nil {
@@ -41,7 +44,17 @@ func (h *MojangHandler) Authorize(c *gin.Context) {
 		writeEnvelopeError(c, envelope.CodeBadRequest, "正版绑定未启用（服务端未配置 Microsoft OAuth）")
 		return
 	}
-	state, err := h.makeState(user.ID)
+	profileID := c.Query("profileId")
+	if profileID == "" {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "缺少档案参数，请从档案卡片发起正版认证")
+		return
+	}
+	profile, err := h.profileSvc.GetOwned(user.ID, profileID)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "档案不存在或不属于当前用户")
+		return
+	}
+	state, err := h.makeState(user.ID, profile.UUID)
 	if err != nil {
 		writeEnvelopeError(c, envelope.CodeInternalError, "failed to create state")
 		return
@@ -65,17 +78,18 @@ func (h *MojangHandler) Callback(c *gin.Context) {
 		fail("缺少授权参数")
 		return
 	}
-	userID, err := h.parseState(state)
+	userID, profileUUID, err := h.parseState(state)
 	if err != nil {
 		fail("state 无效或已过期，请重新发起绑定")
 		return
 	}
 
-	profile, err := h.mojangSvc.Exchange(code)
+	premium, err := h.mojangSvc.Exchange(code)
 	if err != nil {
 		fail("正版认证失败：" + err.Error())
 		return
 	}
+	premiumUUID := util.ToHyphenatedUUID(util.NormalizeUUID(premium.UUID))
 
 	var user model.User
 	if err := database.DB.First(&user, userID).Error; err != nil {
@@ -83,58 +97,85 @@ func (h *MojangHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	// 获取正版皮肤并存入 wardrobe
-	if profile.SkinURL != "" {
-		if data, err := h.mojangSvc.DownloadSkin(profile.SkinURL); err == nil {
-			if texture, err := h.textureSvc.Create(user.ID, model.TextureTypeSkin, profile.SkinModel, data, "Minecraft 正版皮肤", ""); err == nil {
+	// 目标档案必须属于发起认证的用户
+	profile, err := h.profileSvc.GetOwned(user.ID, profileUUID)
+	if err != nil {
+		fail("档案不存在或不属于当前用户")
+		return
+	}
+
+	// 同一正版账号不允许被多个用户绑定
+	var bound int64
+	database.DB.Model(&model.User{}).Where("mojang_uuid = ? AND id <> ?", premiumUUID, user.ID).Count(&bound)
+	if bound > 0 {
+		fail("该正版账号已绑定其他用户")
+		return
+	}
+
+	// 获取正版皮肤并存入 wardrobe（同内容去重；失败不阻断 UUID 同步）
+	var skinTextureID uint
+	if premium.SkinURL != "" {
+		if data, err := h.mojangSvc.DownloadSkin(premium.SkinURL); err == nil {
+			if texture, err := h.textureSvc.CreateOrReuseSkin(user.ID, premium.SkinModel, data, "Minecraft 正版皮肤", "正版认证自动同步"); err == nil {
+				skinTextureID = texture.ID
 				service.WriteAudit(database.DB, user.ID, "mojang.bind_skin", "texture", strconv.FormatUint(uint64(texture.ID), 10),
-					"fetched official skin for "+profile.Name)
+					"fetched official skin for "+premium.Name)
 			}
 		}
 	}
 
-	// 关联正版 UUID / 名称
-	user.MojangUUID = profile.UUID
-	user.MojangName = profile.Name
+	// 同步正版 UUID（与官方皮肤）到目标档案
+	if _, err := h.profileSvc.SyncMojangProfile(profile, premiumUUID, skinTextureID, user.ID); err != nil {
+		fail(err.Error())
+		return
+	}
+
+	// 账号级关联（展示用）
+	user.MojangUUID = premiumUUID
+	user.MojangName = premium.Name
 	if err := database.DB.Save(&user).Error; err != nil {
 		fail("保存失败")
 		return
 	}
-	service.WriteAudit(database.DB, user.ID, "mojang.bind", "user", strconv.FormatUint(uint64(user.ID), 10),
-		"bound official account "+profile.Name+" ("+profile.UUID+")")
+	service.WriteAudit(database.DB, user.ID, "mojang.bind", "profile", profile.UUID,
+		"bound official account "+premium.Name+" ("+premiumUUID+")")
 
-	c.Redirect(http.StatusFound, "/bind-mojang?result=success&name="+url.QueryEscape(profile.Name)+"&uuid="+profile.UUID)
+	c.Redirect(http.StatusFound, "/bind-mojang?result=success&name="+url.QueryEscape(premium.Name)+"&uuid="+profile.UUID+"&profile="+url.QueryEscape(profile.Name))
 }
 
-// makeState 生成带短时有效期的绑定 state（JWT，内含用户 ID）。
-func (h *MojangHandler) makeState(userID uint) (string, error) {
+// makeState 生成带短时有效期的绑定 state（JWT，内含用户 ID 与目标档案 UUID）。
+func (h *MojangHandler) makeState(userID uint, profileUUID string) (string, error) {
 	claims := jwt.MapClaims{
-		"purpose": "mojang_bind",
-		"uid":     userID,
-		"iat":     time.Now().Unix(),
-		"exp":     time.Now().Add(10 * time.Minute).Unix(),
+		"purpose":      "mojang_bind",
+		"uid":          userID,
+		"profile_uuid": profileUUID,
+		"iat":          time.Now().Unix(),
+		"exp":          time.Now().Add(10 * time.Minute).Unix(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWT.Secret))
 }
 
-// parseState 校验绑定 state 并返回用户 ID。
-func (h *MojangHandler) parseState(state string) (uint, error) {
+// parseState 校验绑定 state 并返回用户 ID 与目标档案 UUID。
+func (h *MojangHandler) parseState(state string) (uint, string, error) {
 	token, err := jwt.Parse(state,
 		func(*jwt.Token) (any, error) { return []byte(h.cfg.JWT.Secret), nil },
 		jwt.WithValidMethods([]string{"HS256"}),
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil || !token.Valid {
-		return 0, errors.New("invalid state")
+		return 0, "", errors.New("invalid state")
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || claims["purpose"] != "mojang_bind" {
-		return 0, errors.New("invalid state purpose")
+		return 0, "", errors.New("invalid state purpose")
 	}
 	uid, ok := claims["uid"].(float64)
 	if !ok || uid <= 0 {
-		return 0, errors.New("invalid state uid")
+		return 0, "", errors.New("invalid state uid")
 	}
-	return uint(uid), nil
+	profileUUID, _ := claims["profile_uuid"].(string)
+	if profileUUID == "" {
+		return 0, "", errors.New("invalid state profile")
+	}
+	return uint(uid), profileUUID, nil
 }
-

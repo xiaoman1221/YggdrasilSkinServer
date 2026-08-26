@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom'
 import { AuthProvider } from './stores/auth'
 import { ToastProvider } from './components/Toast'
 import { siteApi } from './api/site'
+import { loadCustomFont } from './lib/fonts'
 import { router } from './router'
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
         if (font) {
           document.documentElement.style.setProperty('--font-ui', font)
         }
+        loadCustomFont(font, (info.font_url || '').trim())
       })
       .catch(() => {})
   }, [])

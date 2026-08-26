@@ -4,6 +4,7 @@ export interface SiteInfo {
   site_name: string
   site_announcement: string
   font_family: string
+  font_url: string
   allow_register: boolean
   allow_upload: boolean
   mojang_enabled: boolean

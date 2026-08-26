@@ -3,6 +3,7 @@ import { Box, Download, Flag, Pencil, Save, Shield, Trash2 } from 'lucide-react'
 import { adminApi, AdminProfile, AdminTexture, AdminUser, AdminYsmModel, SiteSettings, TextureReport } from '../api/admin'
 import { authApi, OAuthProvider } from '../api/auth'
 import { LibraryItem, YsmLibraryItem } from '../api/library'
+import { FONT_PRESETS } from '../lib/fonts'
 import { downloadYsmFile } from '../api/profile'
 import { formatSize } from '../utils/format'
 import { useAuth } from '../stores/auth'
@@ -127,6 +128,7 @@ const emptySettings: SiteSettings = {
   site_announcement: '',
   site_url: '',
   global_font_family: '',
+  global_font_url: '',
   auth_bg_images: '',
   allow_register: 'true',
   allow_upload: 'true',
@@ -214,6 +216,7 @@ function SettingsTab() {
         site_announcement: form.site_announcement,
         site_url: form.site_url.trim(),
         global_font_family: form.global_font_family.trim(),
+        global_font_url: form.global_font_url.trim(),
         auth_bg_images: JSON.stringify(parseBgImages(form.auth_bg_images)),
         allow_register: String(form.allow_register === 'true'),
         allow_upload: String(form.allow_upload === 'true'),
@@ -273,17 +276,54 @@ function SettingsTab() {
           <Field label="站点公告" hint="显示在控制台顶部">
             <Textarea value={form.site_announcement} onChange={(e) => set('site_announcement', e.target.value)} placeholder="欢迎使用 YSS 皮肤站……" />
           </Field>
-          <Field
-            label="全局字体"
-            hint="CSS font-family，如：&quot;Noto Sans SC&quot;, sans-serif；留空使用默认字体"
-          >
-            <Input
-              className="mono"
-              value={form.global_font_family}
-              onChange={(e) => set('global_font_family', e.target.value)}
-              placeholder='"Noto Sans SC", sans-serif'
-            />
-          </Field>
+          <div>
+            <span className="field-label">全局字体</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0 14px' }}>
+              {FONT_PRESETS.map((p) => {
+                const active =
+                  (form.global_font_family || '') === p.family && (form.global_font_url || '') === p.url
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      set('global_font_family', p.family)
+                      set('global_font_url', p.url)
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      border: '1px solid var(--line)',
+                      background: active ? 'var(--accent-soft)' : 'transparent',
+                      color: active ? 'var(--accent-deep)' : 'var(--text-2)',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                    }}
+                  >
+                    {p.name}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <Field label="字体名称（font-family）" hint="自定义字体时填写 CSS 字体栈">
+                <Input
+                  className="mono"
+                  value={form.global_font_family}
+                  onChange={(e) => set('global_font_family', e.target.value)}
+                  placeholder='"Noto Sans SC", sans-serif'
+                />
+              </Field>
+              <Field label="字体文件 URL" hint=".ttf / .woff2；留空使用系统字体">
+                <Input
+                  className="mono"
+                  value={form.global_font_url}
+                  onChange={(e) => set('global_font_url', e.target.value)}
+                  placeholder="https://example.com/font.woff2"
+                />
+              </Field>
+            </div>
+          </div>
           <Field
             label="认证页随机背景图"
             hint="每行一个图片 URL；登录/注册/找回密码等页面会随机展示其中一张"

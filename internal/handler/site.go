@@ -25,6 +25,7 @@ func NewSiteHandler(settingsSvc *service.SettingService, mojangSvc *service.Moja
 
 // Info GET /api/v1/site/info
 func (h *SiteHandler) Info(c *gin.Context) {
+	defs := model.DefaultSettings()
 	var bgImages []string
 	raw := h.settingsSvc.Get(model.SettingAuthBgImages, "")
 	if raw != "" {
@@ -40,7 +41,8 @@ func (h *SiteHandler) Info(c *gin.Context) {
 	c.JSON(http.StatusOK, envelope.OK(gin.H{
 		"site_name":         h.settingsSvc.Get(model.SettingSiteName, "YSS 皮肤站"),
 		"site_announcement": h.settingsSvc.Get(model.SettingSiteAnnouncement, ""),
-		"font_family":       h.settingsSvc.Get(model.SettingGlobalFont, ""),
+		"font_family":       h.settingsSvc.Get(model.SettingGlobalFont, defs[model.SettingGlobalFont]),
+		"font_url":          h.settingsSvc.Get(model.SettingGlobalFontURL, defs[model.SettingGlobalFontURL]),
 		"allow_register":    h.settingsSvc.GetBool(model.SettingAllowRegister, true),
 		"allow_upload":      h.settingsSvc.GetBool(model.SettingAllowUpload, true),
 		"mojang_enabled":    h.mojangSvc != nil && h.mojangSvc.Enabled(),

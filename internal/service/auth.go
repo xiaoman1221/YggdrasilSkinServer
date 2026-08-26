@@ -449,7 +449,8 @@ func (s *AuthService) AdminUpdateUser(userID uint, username, email, newPassword 
 // 返回值 created 表示本次调用实际创建了新账号。
 func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, avatar string, autoCreate bool) (user *model.User, created bool, err error) {
 	var found model.User
-	queryErr := s.db.Where("oauth_type = ? AND oauth_openid = ?", oauthType, openid).First(&found).Error
+	// 用结构体条件让 GORM 套用列名转换（OAuthType → o_auth_type），避免手写列名与命名策略不一致
+	queryErr := s.db.Where(&model.User{OAuthType: oauthType, OAuthOpenID: openid}).First(&found).Error
 	if queryErr == nil {
 		if found.AvatarURL == "" && avatar != "" {
 			found.AvatarURL = avatar
@@ -525,7 +526,7 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, 
 // 目标第三方账号已绑定其他用户时返回 ErrOAuthBound。
 func (s *AuthService) BindOAuthUser(userID uint, oauthType, openid, nickname, email, avatar string) (*model.User, error) {
 	var owner model.User
-	err := s.db.Where("oauth_type = ? AND oauth_openid = ?", oauthType, openid).First(&owner).Error
+	err := s.db.Where(&model.User{OAuthType: oauthType, OAuthOpenID: openid}).First(&owner).Error
 	if err == nil {
 		if owner.ID == userID {
 			return &owner, nil // 已绑定到同一用户，视为成功

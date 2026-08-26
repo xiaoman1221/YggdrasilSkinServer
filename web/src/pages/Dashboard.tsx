@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BadgeCheck, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
+import { BadgeCheck, GripHorizontal, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
 import { profileApi, Profile, textureUrl } from '../api/profile'
 import { siteApi } from '../api/site'
 import { authApi } from '../api/auth'
@@ -12,6 +12,7 @@ import { assetUrl } from '../utils/format'
 export default function Dashboard() {
   const { user } = useAuth()
   const toast = useToast()
+  const apiUrl = `${window.location.origin}/api/yggdrasil`
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [announcement, setAnnouncement] = useState('')
@@ -140,25 +141,55 @@ export default function Dashboard() {
           </Panel>
           <Panel title="接入指南">
             <div className="panel-body">
+              <p className="hint" style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-3)' }}>
+                本站使用 Yggdrasil 认证（authlib-injector），支持 HMCL / PCL / BakaXL / MultiMC 等主流启动器。
+              </p>
               <dl className="kv">
                 <dt>第 1 步</dt>
-                <dd>启动器安装 authlib-injector</dd>
+                <dd>在启动器「版本设置 → 认证服务器」启用 authlib-injector，或将下方按钮直接拖入启动器窗口自动识别</dd>
                 <dt>第 2 步</dt>
-                <dd>认证地址填本站地址</dd>
+                <dd>认证地址填写本站 API 地址（点击按钮可复制，拖拽可交给启动器）</dd>
                 <dt>第 3 步</dt>
                 <dd>使用本站账号登录启动器</dd>
                 <dt>皮肤站</dt>
                 <dd>{siteName || 'YSS 皮肤站'}</dd>
                 <dt>API 地址</dt>
                 <dd>
-                  <span className="mono" style={{ fontSize: 11, wordBreak: 'break-all' }}>
-                    {window.location.origin}/api/yggdrasil
+                  <span className="mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>
+                    {apiUrl}
                   </span>
                 </dd>
               </dl>
-              <p className="hint" style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--text-3)' }}>
-                在「个人皮肤」上传皮肤并应用到档案后，进服即可生效。
-              </p>
+              <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', apiUrl)
+                    e.dataTransfer.setData('text/uri-list', apiUrl)
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(apiUrl)
+                      toast.show('认证地址已复制', 'ok')
+                    } catch {
+                      toast.show('复制失败，请手动复制下方 API 地址', 'err')
+                    }
+                  }}
+                  style={{ width: '100%', justifyContent: 'center', gap: 8 }}
+                >
+                  <GripHorizontal size={16} strokeWidth={1.5} />
+                  拖动此按钮到启动器自动配置（点击复制地址）
+                </button>
+                <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
+                  手动接入：HMCL「版本设置 → 认证服务器」选择 authlib-injector；PCL「设置 → 认证服务器」；BakaXL「账号与档案 → 服务器管理」——粘贴上方 API 地址即可。
+                </p>
+                <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
+                  在「个人皮肤」上传皮肤并应用到档案后，进服即可生效。
+                </p>
+              </div>
             </div>
           </Panel>
         </div>

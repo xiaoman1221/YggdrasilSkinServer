@@ -14,6 +14,8 @@ const (
 	SettingSiteName         = "site_name"
 	SettingSiteAnnouncement = "site_announcement"
 	SettingSiteURL          = "site_url" // 对外地址，替代 YSS_STORAGE_BASE_URL
+	// SettingGlobalFont 全局界面字体（CSS font-family，空表示使用默认字体）
+	SettingGlobalFont        = "global_font_family"
 	// SettingAuthBgImages 登录/注册等认证页随机背景图（JSON 数组字符串，每项为图片 URL）
 	SettingAuthBgImages       = "auth_bg_images"
 	SettingAllowRegister      = "allow_register"
@@ -71,6 +73,7 @@ func DefaultSettings() map[string]string {
 		SettingSiteName:           "YSS 皮肤站",
 		SettingSiteAnnouncement:   "",
 		SettingSiteURL:            "",
+		SettingGlobalFont:         "",
 		SettingAuthBgImages:       "",
 		SettingAllowRegister:      "true",
 		SettingAllowUpload:        "true",

@@ -40,6 +40,7 @@ func (h *SiteHandler) Info(c *gin.Context) {
 	c.JSON(http.StatusOK, envelope.OK(gin.H{
 		"site_name":         h.settingsSvc.Get(model.SettingSiteName, "YSS 皮肤站"),
 		"site_announcement": h.settingsSvc.Get(model.SettingSiteAnnouncement, ""),
+		"font_family":       h.settingsSvc.Get(model.SettingGlobalFont, ""),
 		"allow_register":    h.settingsSvc.GetBool(model.SettingAllowRegister, true),
 		"allow_upload":      h.settingsSvc.GetBool(model.SettingAllowUpload, true),
 		"mojang_enabled":    h.mojangSvc != nil && h.mojangSvc.Enabled(),

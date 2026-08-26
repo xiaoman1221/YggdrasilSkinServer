@@ -126,6 +126,7 @@ const emptySettings: SiteSettings = {
   site_name: '',
   site_announcement: '',
   site_url: '',
+  global_font_family: '',
   auth_bg_images: '',
   allow_register: 'true',
   allow_upload: 'true',
@@ -212,6 +213,7 @@ function SettingsTab() {
         site_name: form.site_name.trim() || 'YSS',
         site_announcement: form.site_announcement,
         site_url: form.site_url.trim(),
+        global_font_family: form.global_font_family.trim(),
         auth_bg_images: JSON.stringify(parseBgImages(form.auth_bg_images)),
         allow_register: String(form.allow_register === 'true'),
         allow_upload: String(form.allow_upload === 'true'),
@@ -270,6 +272,17 @@ function SettingsTab() {
           </div>
           <Field label="站点公告" hint="显示在控制台顶部">
             <Textarea value={form.site_announcement} onChange={(e) => set('site_announcement', e.target.value)} placeholder="欢迎使用 YSS 皮肤站……" />
+          </Field>
+          <Field
+            label="全局字体"
+            hint="CSS font-family，如：&quot;Noto Sans SC&quot;, sans-serif；留空使用默认字体"
+          >
+            <Input
+              className="mono"
+              value={form.global_font_family}
+              onChange={(e) => set('global_font_family', e.target.value)}
+              placeholder='"Noto Sans SC", sans-serif'
+            />
           </Field>
           <Field
             label="认证页随机背景图"

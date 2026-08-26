@@ -6,6 +6,7 @@ export interface SiteSettings {
   site_name: string
   site_announcement: string
   site_url: string
+  global_font_family: string
   auth_bg_images: string
   allow_register: string
   allow_upload: string

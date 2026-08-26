@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BadgeCheck, Download, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
+import { BadgeCheck, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
 import { profileApi, Profile, textureUrl } from '../api/profile'
 import { siteApi } from '../api/site'
 import { authApi } from '../api/auth'
@@ -223,10 +223,6 @@ export default function Dashboard() {
                         </TextLink>
                       {p.ysm_model ? (
                         <>
-                          <a className="link-btn" href={p.ysm_model.url} download>
-                            <Download size={13} strokeWidth={1.5} />
-                            模型
-                          </a>
                           <TextLink
                             onClick={async () => {
                               try {

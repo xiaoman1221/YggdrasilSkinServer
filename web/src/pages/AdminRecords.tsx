@@ -108,6 +108,14 @@ export default function AdminRecords() {
       render: (r) => <span className="data">{new Date(r.created_at).toLocaleString()}</span>,
     },
     {
+      key: 'type',
+      title: '类型',
+      width: 90,
+      render: (r) => (
+        <span className="tag on">{r.type === 'join' ? '进服' : r.type === 'login' ? '登录' : r.type || '登录'}</span>
+      ),
+    },
+    {
       key: 'user',
       title: '用户 ID',
       width: 80,

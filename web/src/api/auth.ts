@@ -21,6 +21,8 @@ export interface LoginRecord {
   ip: string
   user_agent: string
   launcher: string
+  launcher_version?: string
+  type?: string
   created_at: string
 }
 

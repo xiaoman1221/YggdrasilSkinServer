@@ -101,7 +101,7 @@ func (h *YggdrasilHandler) Join(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "IllegalArgumentException", "errorMessage": "invalid request body"})
 		return
 	}
-	status, resp := h.svc.Join(&req)
+	status, resp := h.svc.Join(&req, c.ClientIP(), c.GetHeader("User-Agent"))
 	if status == http.StatusNoContent {
 		c.Status(status)
 		return

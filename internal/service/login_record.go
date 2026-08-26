@@ -19,15 +19,23 @@ func NewLoginRecordService(db *gorm.DB) *LoginRecordService {
 	return &LoginRecordService{db: db}
 }
 
-// Record 写入一条登录记录。
-func (s *LoginRecordService) Record(userID uint, profileID, profileName, ip, userAgent string) error {
+// 登录记录类型。
+const (
+	RecordTypeLogin = "login" // 启动器登录
+	RecordTypeJoin  = "join"  // 进入游戏服务器
+)
+
+// Record 写入一条登录/进入服务器记录。
+func (s *LoginRecordService) Record(userID uint, profileID, profileName, ip, userAgent, recordType string) error {
 	record := &model.LoginRecord{
-		UserID:      userID,
-		ProfileID:   profileID,
-		ProfileName: profileName,
-		IP:          ip,
-		UserAgent:   userAgent,
-		Launcher:    util.DetectLauncher(userAgent),
+		UserID:          userID,
+		ProfileID:       profileID,
+		ProfileName:     profileName,
+		IP:              ip,
+		UserAgent:       userAgent,
+		Launcher:        util.DetectLauncher(userAgent),
+		LauncherVersion: util.DetectLauncherVersion(userAgent),
+		Type:            recordType,
 	}
 	return s.db.Create(record).Error
 }

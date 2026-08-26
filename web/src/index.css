@@ -37,7 +37,7 @@
   --shadow-md: 0 6px 16px rgba(16, 24, 40, 0.1);
   --bevel: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 
-  --page-pad: clamp(16px, 3vw, 40px);
+  --page-pad: clamp(12px, 1.6vw, 24px);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -747,11 +747,11 @@ body {
 .app-body {
   display: flex;
   align-items: flex-start;
-  gap: clamp(20px, 3vw, 40px);
+  gap: clamp(16px, 2vw, 28px);
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: clamp(20px, 3vw, 40px) var(--page-pad) 80px;
+  max-width: 1600px;
+  margin: 0;
+  padding: clamp(16px, 2vw, 28px) var(--page-pad) 80px;
 }
 
 .sidebar {

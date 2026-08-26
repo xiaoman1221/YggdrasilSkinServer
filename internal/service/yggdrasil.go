@@ -262,7 +262,7 @@ func (s *YggdrasilService) Authenticate(req *AuthenticateRequest, ip, userAgent 
 		profileID = selected.UUID
 		profileName = selected.Name
 	}
-	if err := s.loginRecord.Record(user.ID, profileID, profileName, ip, userAgent); err != nil {
+	if err := s.loginRecord.Record(user.ID, profileID, profileName, ip, userAgent, RecordTypeLogin); err != nil {
 		// 记录失败不影响登录
 		s.db.Logger.Error(nil, "record login failed: %v", err)
 	}
@@ -363,7 +363,7 @@ func (s *YggdrasilService) SessionProfile(uuid string) (int, any) {
 }
 
 // Join 处理服务端加入请求（记录 serverId）。
-func (s *YggdrasilService) Join(req *JoinRequest) (int, gin.H) {
+func (s *YggdrasilService) Join(req *JoinRequest, ip, userAgent string) (int, gin.H) {
 	if req == nil || req.AccessToken == "" || req.SelectedProfile == nil || req.SelectedProfile.ID == "" || req.ServerID == "" {
 		return yggdrasilError(http.StatusBadRequest, "IllegalArgumentException", "accessToken, selectedProfile and serverId are required")
 	}
@@ -395,6 +395,10 @@ func (s *YggdrasilService) Join(req *JoinRequest) (int, gin.H) {
 		joinedAt:  now,
 	}
 	s.mu.Unlock()
+	// 记录进入服务器行为（服务器 IP 为请求来源）
+	if err := s.loginRecord.Record(token.UserID, profile.UUID, profile.Name, ip, userAgent, RecordTypeJoin); err != nil {
+		s.db.Logger.Error(nil, "record join failed: %v", err)
+	}
 	return http.StatusNoContent, nil
 }
 

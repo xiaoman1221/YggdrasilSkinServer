@@ -1,0 +1,22 @@
+﻿# Go
+*.exe
+*.test
+*.out
+
+# 运行数据（SQLite、上传的纹理）
+data/
+
+# 前端
+web/node_modules/
+web/dist/
+
+# IDE
+.idea/
+.vscode/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 调试用临时解压目录（.ysm 样例）
+.tmp_model/

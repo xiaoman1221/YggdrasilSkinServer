@@ -805,7 +805,7 @@ body {
 .grid {
   display: grid;
   /* 卡片内 3D 预览 176px + 内边距 28px，最小 240px 保证文字不挤压换行 */
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: clamp(14px, 2vw, 20px);
 }
 
@@ -878,6 +878,11 @@ body {
 @container (max-width: 360px) {
   .pcard-actions .lnk-txt {
     display: none;
+  }
+  /* 宽度不足时：鼠标悬停到哪个按钮，就展开显示哪个按钮的文字（不依赖原生提示） */
+  .pcard-actions .link-btn:hover .lnk-txt,
+  .pcard-actions .link-btn:focus-visible .lnk-txt {
+    display: inline;
   }
 }
 

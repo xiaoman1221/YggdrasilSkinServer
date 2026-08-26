@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BadgeCheck, GripHorizontal, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
+import { BadgeCheck, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
 import { profileApi, Profile, textureUrl } from '../api/profile'
 import { siteApi } from '../api/site'
 import { authApi } from '../api/auth'
@@ -163,7 +163,6 @@ export default function Dashboard() {
               <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
                 <button
                   id="ygg-dnd-button"
-                  type="button"
                   className="btn btn-primary"
                   draggable
                   data-clipboard-text={apiUrl}
@@ -172,18 +171,8 @@ export default function Dashboard() {
                     e.dataTransfer.setData('text/uri-list', apiUrl)
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(apiUrl)
-                      toast.show('认证地址已复制', 'ok')
-                    } catch {
-                      toast.show('复制失败，请手动复制下方 API 地址', 'err')
-                    }
-                  }}
-                  style={{ width: '100%', justifyContent: 'center', gap: 8 }}
                 >
-                  <GripHorizontal size={16} strokeWidth={1.5} />
-                  将此按钮拖动至启动器（点击可复制地址）
+                  将此按钮拖动至启动器
                 </button>
                 <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
                   手动接入：HMCL「版本设置 → 认证服务器」选择 authlib-injector；PCL「设置 → 认证服务器」；BakaXL「账号与档案 → 服务器管理」——粘贴上方 API 地址即可。

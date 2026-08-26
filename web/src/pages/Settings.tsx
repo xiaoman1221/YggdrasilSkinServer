@@ -1,5 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Smartphone } from 'lucide-react'
+import {
+  Apple,
+  Building2,
+  Cloud,
+  Code2,
+  Compass,
+  Gamepad2,
+  GitBranch,
+  Globe,
+  MessageCircle,
+  MessagesSquare,
+  Monitor,
+  Play,
+  Search,
+  Share2,
+  Smartphone,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
 import { authApi, OAuthProvider, PasskeyCredential, SessionInfo } from '../api/auth'
@@ -7,6 +26,33 @@ import { assetUrl } from '../utils/format'
 import { createPasskey } from '../lib/webauthn'
 import { useToast } from '../components/Toast'
 import { Button, Empty, Field, Input, Panel, Spinner, StatusTag } from '../components/ui'
+
+/** OauthGo 渠道 → 图标映射（未匹配时使用通用地球图标）。 */
+const providerIcons: Record<string, LucideIcon> = {
+  gitee: Code2,
+  github: GitBranch,
+  qq: MessageCircle,
+  wechat: MessagesSquare,
+  weixin: MessagesSquare,
+  alipay: Wallet,
+  dingtalk: Building2,
+  baidu: Compass,
+  weibo: Share2,
+  douyin: Play,
+  xiaomi: Smartphone,
+  feishu: Cloud,
+  microsoft: Monitor,
+  google: Search,
+  apple: Apple,
+  steam: Gamepad2,
+  discord: MessagesSquare,
+  facebook: Users,
+}
+
+function ProviderIcon({ name, size = 20 }: { name: string; size?: number }) {
+  const Icon = providerIcons[name] || Globe
+  return <Icon size={size} strokeWidth={1.75} />
+}
 
 export default function Settings() {
   const { user, refreshUser, logout } = useAuth()
@@ -95,9 +141,14 @@ export default function Settings() {
     }
   }
 
-  async function unbindOauth() {
-    if (!user?.oauth_type) return
-    if (!window.confirm(`确认解除「${user.oauth_type}」绑定？解除后将不能再用该渠道直接登录本站。`)) return
+  function providerName(type: string): string {
+    return oauthProviders.find((p) => p.name === type)?.display_name || type
+  }
+
+  async function unbindOauth(oauthType?: string) {
+    const type = oauthType || user?.oauth_type
+    if (!type) return
+    if (!window.confirm(`确认解除「${providerName(type)}」绑定？解除后将不能再用该渠道直接登录本站。`)) return
     setOauthBusy(true)
     try {
       await authApi.oauthUnbind()
@@ -250,10 +301,19 @@ export default function Settings() {
             <dt>权限</dt>
             <dd>{user?.permissions}</dd>
             <dt>第三方登录</dt>
-            <dd>{user?.oauth_type ? `已绑定 ${user.oauth_type}` : '未绑定'}</dd>
+            <dd>
+              {user?.oauth_type ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <ProviderIcon name={user.oauth_type} size={16} />
+                  已绑定 {providerName(user.oauth_type)}
+                </span>
+              ) : (
+                '未绑定'
+              )}
+            </dd>
           </dl>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
-            <label className="btn" style={{ cursor: 'pointer' }}>
+            <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
               {avatarBusy ? '上传中…' : '上传头像'}
               <input
                 type="file"
@@ -323,10 +383,14 @@ export default function Settings() {
       <Panel title="第三方登录">
         <div className="panel-body">
           <p className="hint" style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--text-3)' }}>
-            绑定第三方账号后，可用它快捷登录本站。
+            绑定第三方账号后，可用它快捷登录本站。点击下方对应图标即可绑定 / 解绑。
           </p>
           {oauthLoading ? (
             <Spinner label="加载第三方登录渠道" />
+          ) : oauthProviders.length === 0 ? (
+            <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
+              第三方登录未启用，或站点未配置可用渠道。
+            </p>
           ) : (
             <div style={{ display: 'grid', gap: 12 }}>
               <div
@@ -340,36 +404,49 @@ export default function Settings() {
                   background: 'var(--bg-muted)',
                 }}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, color: 'var(--text)' }}>
-                    {user?.oauth_type ? `已绑定 ${user.oauth_type}` : '未绑定第三方账号'}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                    {user?.oauth_type ? '已可通过该渠道快捷登录本站' : '绑定后可用第三方账号一键登录'}
-                  </div>
-                </div>
                 {user?.oauth_type ? (
-                  <Button size="sm" variant="ghost" disabled={oauthBusy} onClick={unbindOauth}>
-                    解绑
-                  </Button>
-                ) : null}
+                  <>
+                    <span style={{ fontSize: 14, color: 'var(--text)' }}>已绑定</span>
+                    <ProviderIcon name={user.oauth_type} size={20} />
+                    <span className="mono" style={{ fontSize: 14, color: 'var(--text)' }}>
+                      {providerName(user.oauth_type)}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>可点击下方对应图标解绑</span>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 14, color: 'var(--text)' }}>未绑定第三方账号</span>
+                )}
               </div>
-              {oauthProviders.length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {oauthProviders.map((p) => {
-                    const isBound = user?.oauth_type === p.name
-                    return (
-                      <Button key={p.name} size="sm" disabled={oauthBusy || isBound} onClick={() => bindOauth(p.name)}>
-                        {isBound ? `已绑定 ${p.display_name || p.name}` : `绑定 ${p.display_name || p.name}`}
-                      </Button>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
-                  第三方登录未启用，或站点未配置可用渠道。
-                </p>
-              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {oauthProviders.map((p) => {
+                  const isBound = user?.oauth_type === p.name
+                  return (
+                    <button
+                      key={p.name}
+                      type="button"
+                      title={`${isBound ? '解绑' : '绑定'} ${p.display_name || p.name}`}
+                      disabled={oauthBusy}
+                      onClick={() => (isBound ? unbindOauth(p.name) : bindOauth(p.name))}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '8px 12px',
+                        borderRadius: 10,
+                        border: `1px solid ${isBound ? 'var(--accent)' : 'var(--line)'}`,
+                        background: isBound ? 'var(--accent-soft)' : 'transparent',
+                        color: isBound ? 'var(--accent-deep)' : 'var(--text-2)',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                      }}
+                    >
+                      <ProviderIcon name={p.name} size={22} />
+                      <span>{p.display_name || p.name}</span>
+                      {isBound ? <span style={{ fontSize: 12 }}>已绑定</span> : null}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>

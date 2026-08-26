@@ -448,34 +448,33 @@ func (s *AuthService) AdminUpdateUser(userID uint, username, email, newPassword 
 // avatar 为第三方平台头像地址（可为空），新账号或尚未设置头像的账号会使用它。
 // 返回值 created 表示本次调用实际创建了新账号。
 func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, avatar string, autoCreate bool) (user *model.User, created bool, err error) {
-	var found model.User
-	// 用结构体条件让 GORM 套用列名转换（OAuthType → o_auth_type），避免手写列名与命名策略不一致
-	queryErr := s.db.Where(&model.User{OAuthType: oauthType, OAuthOpenID: openid}).First(&found).Error
+	// 1. 按绑定记录查找（一个用户可绑定多个第三方账号）
+	var binding model.UserOAuthBinding
+	queryErr := s.db.Where(&model.UserOAuthBinding{OAuthType: oauthType, OAuthOpenID: openid}).First(&binding).Error
 	if queryErr == nil {
+		var found model.User
+		if err := s.db.First(&found, binding.UserID).Error; err != nil {
+			return nil, false, err
+		}
 		if found.AvatarURL == "" && avatar != "" {
 			found.AvatarURL = avatar
 			if err := s.db.Save(&found).Error; err != nil {
 				return nil, false, err
 			}
 		}
+		// 刷新第三方昵称/头像（非关键，失败忽略）
+		_ = s.db.Model(&model.UserOAuthBinding{}).Where("id = ?", binding.ID).
+			Updates(map[string]any{"nickname": truncate(nickname, 128), "avatar": truncate(avatar, 1024)}).Error
 		return &found, false, nil
 	}
 	if !errors.Is(queryErr, gorm.ErrRecordNotFound) {
 		return nil, false, queryErr
 	}
-	// 未绑定：优先按邮箱匹配已有账号
+	// 2. 未绑定：优先按邮箱匹配已有账号，并追加一条绑定
 	if email != "" {
+		var found model.User
 		if err := s.db.Where("email = ?", strings.ToLower(email)).First(&found).Error; err == nil {
-			// 邮箱已属于其它已绑定 OAuth 的账号：不再自动绑定，避免静默覆盖
-			if found.OAuthType != "" && found.OAuthType != oauthType {
-				return nil, false, ErrOAuthBound
-			}
-			found.OAuthType = oauthType
-			found.OAuthOpenID = openid
-			if found.AvatarURL == "" {
-				found.AvatarURL = avatar
-			}
-			if err := s.db.Save(&found).Error; err != nil {
+			if err := s.addOAuthBinding(&found, oauthType, openid, nickname, avatar); err != nil {
 				return nil, false, err
 			}
 			return &found, false, nil
@@ -486,7 +485,7 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, 
 	if !autoCreate {
 		return nil, false, ErrOAuthNotFound
 	}
-	// 创建新账号：邮箱为必填唯一字段，第三方未提供时使用占位邮箱
+	// 3. 创建新账号并写入绑定
 	username := strings.TrimSpace(nickname)
 	if !usernamePattern.MatchString(username) {
 		username = "user_" + openid[:min(10, len(openid))]
@@ -512,11 +511,12 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, 
 		Username:     username,
 		PasswordHash: hash,
 		Permissions:  "user",
-		OAuthType:    oauthType,
-		OAuthOpenID:  openid,
 		AvatarURL:    avatar,
 	}
 	if err := s.db.Create(newUser).Error; err != nil {
+		return nil, false, err
+	}
+	if err := s.addOAuthBinding(newUser, oauthType, openid, nickname, avatar); err != nil {
 		return nil, false, err
 	}
 	return newUser, true, nil
@@ -525,47 +525,130 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, 
 // BindOAuthUser 把第三方账号绑定到指定本站用户。
 // 目标第三方账号已绑定其他用户时返回 ErrOAuthBound。
 func (s *AuthService) BindOAuthUser(userID uint, oauthType, openid, nickname, email, avatar string) (*model.User, error) {
-	var owner model.User
-	err := s.db.Where(&model.User{OAuthType: oauthType, OAuthOpenID: openid}).First(&owner).Error
+	var user model.User
+	if err := s.db.First(&user, userID).Error; err != nil {
+		return nil, ErrUserNotFound
+	}
+	var binding model.UserOAuthBinding
+	err := s.db.Where(&model.UserOAuthBinding{OAuthType: oauthType, OAuthOpenID: openid}).First(&binding).Error
 	if err == nil {
-		if owner.ID == userID {
-			return &owner, nil // 已绑定到同一用户，视为成功
+		if binding.UserID == userID {
+			return &user, nil // 已绑定到同一用户，视为成功
 		}
 		return nil, ErrOAuthBound
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	var user model.User
-	if err := s.db.First(&user, userID).Error; err != nil {
-		return nil, ErrUserNotFound
-	}
-	user.OAuthType = oauthType
-	user.OAuthOpenID = openid
-	if user.AvatarURL == "" && avatar != "" {
-		user.AvatarURL = avatar
-	}
-	if err := s.db.Save(&user).Error; err != nil {
+	if err := s.addOAuthBinding(&user, oauthType, openid, nickname, avatar); err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-// UnbindOAuthUser 解除当前用户的第三方绑定。
-func (s *AuthService) UnbindOAuthUser(userID uint) (*model.User, error) {
+// UnbindOAuthUser 解除当前用户指定渠道的第三方绑定。
+func (s *AuthService) UnbindOAuthUser(userID uint, oauthType string) (*model.User, error) {
 	var user model.User
 	if err := s.db.First(&user, userID).Error; err != nil {
 		return nil, ErrUserNotFound
 	}
-	if user.OAuthType == "" && user.OAuthOpenID == "" {
-		return &user, nil // 未绑定，视为成功
+	if strings.TrimSpace(oauthType) == "" {
+		return nil, errors.New("missing oauth type")
 	}
-	user.OAuthType = ""
-	user.OAuthOpenID = ""
-	if err := s.db.Save(&user).Error; err != nil {
+	if err := s.db.Where(&model.UserOAuthBinding{UserID: userID, OAuthType: oauthType}).
+		Delete(&model.UserOAuthBinding{}).Error; err != nil {
+		return nil, err
+	}
+	if err := s.syncUserOAuthPrimary(&user); err != nil {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// ListOAuthBindings 返回用户全部第三方绑定（按绑定时间正序）。
+func (s *AuthService) ListOAuthBindings(userID uint) ([]model.UserOAuthBinding, error) {
+	var bindings []model.UserOAuthBinding
+	err := s.db.Where("user_id = ?", userID).Order("created_at ASC").Find(&bindings).Error
+	return bindings, err
+}
+
+// syncUserOAuthPrimary 用绑定列表刷新用户表上的主绑定字段（兼容旧版 oauth_type 展示字段）。
+func (s *AuthService) syncUserOAuthPrimary(user *model.User) error {
+	bindings, err := s.ListOAuthBindings(user.ID)
+	if err != nil {
+		return err
+	}
+	user.OAuthType = ""
+	user.OAuthOpenID = ""
+	if len(bindings) > 0 {
+		user.OAuthType = bindings[0].OAuthType
+		user.OAuthOpenID = bindings[0].OAuthOpenID
+	}
+	return s.db.Save(user).Error
+}
+
+// addOAuthBinding 写入一条第三方绑定，并同步用户表的主绑定字段。
+// 同一第三方账号已绑定其它用户时返回 ErrOAuthBound。
+func (s *AuthService) addOAuthBinding(user *model.User, oauthType, openid, nickname, avatar string) error {
+	if user.ID == 0 {
+		return errors.New("invalid user")
+	}
+	var binding model.UserOAuthBinding
+	err := s.db.Where(&model.UserOAuthBinding{OAuthType: oauthType, OAuthOpenID: openid}).First(&binding).Error
+	if err == nil {
+		if binding.UserID == user.ID {
+			return nil // 已绑定到同一用户
+		}
+		return ErrOAuthBound
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	newBinding := &model.UserOAuthBinding{
+		UserID:      user.ID,
+		OAuthType:   oauthType,
+		OAuthOpenID: openid,
+		Nickname:    truncate(nickname, 128),
+		Avatar:      truncate(avatar, 1024),
+	}
+	if err := s.db.Create(newBinding).Error; err != nil {
+		return err
+	}
+	if user.OAuthType == "" {
+		return s.syncUserOAuthPrimary(user)
+	}
+	return nil
+}
+
+// MigrateOAuthBindings 把旧版 users 表上的单绑定（oauth_type/oauth_openid）迁移到绑定表（幂等）。
+func MigrateOAuthBindings(db *gorm.DB) error {
+	var users []model.User
+	if err := db.Find(&users).Error; err != nil {
+		return err
+	}
+	for i := range users {
+		u := &users[i]
+		if u.OAuthType == "" || u.OAuthOpenID == "" {
+			continue
+		}
+		var count int64
+		if err := db.Model(&model.UserOAuthBinding{}).
+			Where("user_id = ? AND o_auth_type = ? AND o_auth_open_id = ?", u.ID, u.OAuthType, u.OAuthOpenID).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+		if err := db.Create(&model.UserOAuthBinding{
+			UserID:      u.ID,
+			OAuthType:   u.OAuthType,
+			OAuthOpenID: u.OAuthOpenID,
+		}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func min(a, b int) int {

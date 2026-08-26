@@ -194,7 +194,12 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
 		return
 	}
-	c.JSON(http.StatusOK, envelope.OK(gin.H{"user": user}))
+	bindings, err := h.authSvc.ListOAuthBindings(user.ID)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"user": user, "oauth_bindings": bindings}))
 }
 
 // sessionView 是会话列表的视图（隐藏 refreshToken）。
@@ -781,7 +786,14 @@ func (h *AuthHandler) OAuthUnbind(c *gin.Context) {
 		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
 		return
 	}
-	updated, err := h.authSvc.UnbindOAuthUser(user.ID)
+	var req struct {
+		Type string `json:"type"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
+		return
+	}
+	updated, err := h.authSvc.UnbindOAuthUser(user.ID, req.Type)
 	if err != nil {
 		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
 		return

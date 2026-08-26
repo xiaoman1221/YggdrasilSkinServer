@@ -61,6 +61,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 	if err := settingsSvc.Seed(cfg); err != nil {
 		log.Printf("[settings] seed failed: %v", err)
 	}
+	if err := service.MigrateOAuthBindings(database.DB); err != nil {
+		log.Printf("[oauth] migrate legacy bindings failed: %v", err)
+	}
 	authSvc := service.NewAuthService(database.DB, cfg, settingsSvc)
 	profileSvc := service.NewProfileService(database.DB, cfg)
 	textureSvc := service.NewTextureService(database.DB, cfg, settingsSvc)

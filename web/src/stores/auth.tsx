@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!localStorage.getItem(ACCESS_KEY)) return
     try {
       const res = await authApi.me()
-      setUser(res.user)
+      setUser({ ...res.user, oauth_bindings: res.oauth_bindings || [] })
     } catch {
       setUser(null)
     }

@@ -64,6 +64,7 @@ func Init(cfg *config.Config) error {
 func AutoMigrate() error {
 	return DB.AutoMigrate(
 		&model.User{},
+		&model.UserOAuthBinding{},
 		&model.Session{},
 		&model.Profile{},
 		&model.Texture{},

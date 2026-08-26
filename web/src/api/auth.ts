@@ -10,8 +10,14 @@ export interface User {
   mojang_uuid?: string
   mojang_name?: string
   oauth_type?: string
+  oauth_bindings?: OAuthBinding[]
 }
 
+export interface OAuthBinding {
+  oauth_type: string
+  nickname?: string
+  created_at: string
+}
 
 export interface LoginRecord {
   id: number
@@ -82,7 +88,7 @@ export const authApi = {
   logout: (refreshToken: string) =>
     request<void>({ method: 'POST', url: '/auth/logout', data: { refreshToken } }),
 
-  me: () => request<{ user: User }>({ method: 'GET', url: '/auth/me' }),
+  me: () => request<{ user: User; oauth_bindings?: OAuthBinding[] }>({ method: 'GET', url: '/auth/me' }),
 
   setAvatar: (textureId: number) =>
     request<{ user: User }>({ method: 'PUT', url: '/auth/avatar', data: { textureId } }),
@@ -172,7 +178,8 @@ export const authApi = {
   oauthBindAuthorize: (type: string) =>
     request<{ url: string }>({ method: 'GET', url: '/auth/oauth/bind-authorize', params: { type } }),
 
-  oauthUnbind: () => request<{ user: User }>({ method: 'POST', url: '/auth/oauth/unbind' }),
+  oauthUnbind: (type: string) =>
+    request<{ user: User }>({ method: 'POST', url: '/auth/oauth/unbind', data: { type } }),
 }
 
 

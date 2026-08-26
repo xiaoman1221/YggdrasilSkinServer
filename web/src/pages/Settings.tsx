@@ -145,13 +145,12 @@ export default function Settings() {
     return oauthProviders.find((p) => p.name === type)?.display_name || type
   }
 
-  async function unbindOauth(oauthType?: string) {
-    const type = oauthType || user?.oauth_type
-    if (!type) return
-    if (!window.confirm(`确认解除「${providerName(type)}」绑定？解除后将不能再用该渠道直接登录本站。`)) return
+  async function unbindOauth(oauthType: string) {
+    if (!oauthType) return
+    if (!window.confirm(`确认解除「${providerName(oauthType)}」绑定？解除后将不能再用该渠道直接登录本站。`)) return
     setOauthBusy(true)
     try {
-      await authApi.oauthUnbind()
+      await authApi.oauthUnbind(oauthType)
       await refreshUser()
       toast.show('已解除绑定', 'ok')
     } catch (err: any) {
@@ -302,10 +301,14 @@ export default function Settings() {
             <dd>{user?.permissions}</dd>
             <dt>第三方登录</dt>
             <dd>
-              {user?.oauth_type ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <ProviderIcon name={user.oauth_type} size={16} />
-                  已绑定 {providerName(user.oauth_type)}
+              {(user?.oauth_bindings || []).length > 0 ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                  {(user?.oauth_bindings || []).map((b) => (
+                    <span key={b.oauth_type} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title={b.nickname}>
+                      <ProviderIcon name={b.oauth_type} size={16} />
+                      {providerName(b.oauth_type)}
+                    </span>
+                  ))}
                 </span>
               ) : (
                 '未绑定'
@@ -404,13 +407,19 @@ export default function Settings() {
                   background: 'var(--bg-muted)',
                 }}
               >
-                {user?.oauth_type ? (
+                {(user?.oauth_bindings || []).length > 0 ? (
                   <>
-                    <span style={{ fontSize: 14, color: 'var(--text)' }}>已绑定</span>
-                    <ProviderIcon name={user.oauth_type} size={20} />
-                    <span className="mono" style={{ fontSize: 14, color: 'var(--text)' }}>
-                      {providerName(user.oauth_type)}
+                    <span style={{ fontSize: 14, color: 'var(--text)' }}>
+                      已绑定 {(user?.oauth_bindings || []).length} 个第三方账号
                     </span>
+                    {(user?.oauth_bindings || []).map((b) => (
+                      <span key={b.oauth_type} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title={b.nickname}>
+                        <ProviderIcon name={b.oauth_type} size={20} />
+                        <span className="mono" style={{ fontSize: 14, color: 'var(--text)' }}>
+                          {providerName(b.oauth_type)}
+                        </span>
+                      </span>
+                    ))}
                     <span style={{ fontSize: 12, color: 'var(--text-3)' }}>可点击下方对应图标解绑</span>
                   </>
                 ) : (
@@ -419,7 +428,7 @@ export default function Settings() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 {oauthProviders.map((p) => {
-                  const isBound = user?.oauth_type === p.name
+                  const isBound = (user?.oauth_bindings || []).some((b) => b.oauth_type === p.name)
                   return (
                     <button
                       key={p.name}

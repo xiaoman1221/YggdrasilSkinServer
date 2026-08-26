@@ -23,7 +23,9 @@ export interface YsmModel {
   usage_agreement: string
   purchase_url: string
   price_info: string
+  is_free: boolean
   url: string
+  preview_url?: string
   created_at: string
 }
 
@@ -152,3 +154,30 @@ export function textureUrl(hash: string): string {
   return `/textures/${hash}.png`
 }
 
+/**
+ * 下载 YSM 模型文件。
+ * 免费模型可直接下载；付费模型需要登录且为作者/管理员，浏览器普通链接不会带登录态，
+ * 因此统一用 fetch + Authorization 头拉取后保存为本地文件。
+ */
+export async function downloadYsmFile(model: { url: string; name: string; format: string }): Promise<void> {
+  const token = localStorage.getItem('yss_access_token')
+  const resp = await fetch(model.url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!resp.ok) {
+    if (resp.status === 403) {
+      const text = await resp.text().catch(() => '')
+      throw new Error(text.trim() || '该模型为付费模型，购买后才能下载')
+    }
+    throw new Error(`下载失败（HTTP ${resp.status}）`)
+  }
+  const blob = await resp.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = `${(model.name || 'model').replace(/[\\/:*?"<>|]/g, '_')}.${model.format}`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(objectUrl)
+}

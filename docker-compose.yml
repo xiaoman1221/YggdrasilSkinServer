@@ -1,0 +1,35 @@
+﻿# YggdrasilSkinServer 一键部署
+#
+# 首次使用：
+#   1. 在项目根目录创建 .env，至少设置：
+#        YSS_JWT_SECRET=<足够长的随机字符串>
+#   2. docker compose up -d --build
+#   3. 访问 http://localhost:8080 ，首次调用 POST /api/v1/auth/setup 初始化管理员
+#
+# 数据持久化在命名卷 yss-data（SQLite + textures + ysm），删除容器不丢失。
+
+services:
+  yss:
+    build: .
+    image: yggdrasil-skin-server:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # release 模式下后端会拒绝默认 JWT 密钥启动，必须显式设置
+      YSS_JWT_SECRET: ${YSS_JWT_SECRET:?set YSS_JWT_SECRET in .env}
+      YSS_SERVER_MODE: release
+      # 对外公开访问地址，用于拼接纹理 URL（如 https://skin.example.com）
+      YSS_STORAGE_BASE_URL: ${YSS_STORAGE_BASE_URL:-http://localhost:8080}
+      YSS_YGGDRASIL_SERVER_NAME: ${YSS_YGGDRASIL_SERVER_NAME:-YggdrasilSkinServer}
+      YSS_YGGDRASIL_SKIN_DOMAINS: ${YSS_YGGDRASIL_SKIN_DOMAINS:-localhost}
+      # 正版（Microsoft）绑定为可选功能，需要时取消注释并配置 Azure 应用注册
+      # YSS_MICROSOFT_CLIENT_ID: ${YSS_MICROSOFT_CLIENT_ID:-}
+      # YSS_MICROSOFT_CLIENT_SECRET: ${YSS_MICROSOFT_CLIENT_SECRET:-}
+      # YSS_MICROSOFT_REDIRECT_URI: ${YSS_MICROSOFT_REDIRECT_URI:-http://localhost:8080/api/v1/auth/mojang/callback}
+    volumes:
+      - yss-data:/app/data
+    # 健康检查已内置于 Dockerfile（GET /health）
+
+volumes:
+  yss-data:

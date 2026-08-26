@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Box, Download, Pencil, Save, Shield, Trash2 } from 'lucide-react'
 import { adminApi, AdminProfile, AdminTexture, AdminUser, AdminYsmModel, SiteSettings, TextureReport } from '../api/admin'
 import { LibraryItem } from '../api/library'
+import { downloadYsmFile } from '../api/profile'
 import { formatSize } from '../utils/format'
 import { useAuth } from '../stores/auth'
 import { useToast } from '../components/Toast'
@@ -1070,10 +1071,16 @@ function YsmTab() {
       width: 150,
       render: (m) => (
         <span style={{ display: 'inline-flex', gap: 12 }}>
-          <a className="link-btn" href={m.url} download>
+          <span
+            className="link-btn"
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              downloadYsmFile(m).catch((err: any) => toast.show(err?.message || '下载失败', 'err'))
+            }}
+          >
             <Download size={13} strokeWidth={1.5} />
             下载
-          </a>
+          </span>
           <TextLink danger onClick={() => remove(m)}>
             <Trash2 size={13} strokeWidth={1.5} />
             删除

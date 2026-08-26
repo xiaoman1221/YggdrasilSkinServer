@@ -43,7 +43,6 @@ func Setup(cfg *config.Config) *gin.Engine {
 	}
 	texturesGroup := r.Group("/", immutable())
 	texturesGroup.Static("/textures", cfg.Storage.TextureDir)
-	texturesGroup.Static("/ysm", cfg.Storage.YsmDir)
 
 	// 前端托管：web/dist 存在时由后端直接提供 SPA，否则提供最小首页
 	registerWebFrontend(r, cfg)
@@ -73,7 +72,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	// 处理器
 	authHandler := handler.NewAuthHandler(authSvc, textureSvc, mailSvc, oauthSvc, settingsSvc)
 	profileHandler := handler.NewProfileHandler(profileSvc, textureSvc)
-	ysmHandler := handler.NewYsmHandler(ysmSvc, profileSvc)
+	ysmHandler := handler.NewYsmHandler(ysmSvc, profileSvc, cfg)
 	wardrobeHandler := handler.NewWardrobeHandler(textureSvc, librarySvc)
 	libraryHandler := handler.NewTextureLibraryHandler(librarySvc, textureSvc)
 	adminHandler := handler.NewAdminHandler(profileSvc, librarySvc, textureSvc, settingsSvc, mailSvc, authSvc)
@@ -84,6 +83,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	registerYggdrasilRoutes(r, yggHandler)
 	registerV1Routes(r, cfg, authHandler, profileHandler, wardrobeHandler, libraryHandler, adminHandler, siteHandler, loginRecordHandler, mojangHandler, ysmHandler)
+	// YSM 模型下载：免费模型公开，付费模型由 handler 校验作者/管理员权限
+	r.GET("/ysm/:file", ysmHandler.ServeFile)
 
 	return r
 }
@@ -300,7 +301,6 @@ func registerWebFrontend(r *gin.Engine, cfg *config.Config) {
 		serveIndex(c)
 	})
 }
-
 
 
 

@@ -11,6 +11,12 @@ function isPng(data: Uint8Array): boolean {
   return data.length > 8 && data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47
 }
 
+/** 附加登录态：付费模型需要作者/管理员登录后才能下载。 */
+function authHeaders(): HeadersInit {
+  const token = localStorage.getItem('yss_access_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 /**
  * 【Wasm 解析接口】解密模型二进制流，返回内部文件列表。
  *
@@ -36,8 +42,9 @@ export async function decodeYsmModelFile(buffer: ArrayBuffer, format: 'ysm' | 'z
 export async function fetchModelBuffer(
   url: string,
   onProgress?: (loaded: number, total: number) => void,
+  headers: HeadersInit = {},
 ): Promise<ArrayBuffer> {
-  const resp = await fetch(url)
+  const resp = await fetch(url, { headers: { ...authHeaders(), ...headers } })
   if (!resp.ok) throw new Error(`下载模型失败（HTTP ${resp.status}）`)
   const total = Number(resp.headers.get('content-length')) || 0
   if (!resp.body || !total) return resp.arrayBuffer()
@@ -106,8 +113,54 @@ export function buildTextureOptions(files: DecodedFile[]): YsmTextureOption[] {
   return options
 }
 
+/** 模型包内常见封面/预览图文件名（不含扩展名，忽略大小写）。 */
+const COVER_NAMES = ['ysm-pack', 'preview', '预览', '封面', 'cover', 'poster', 'thumbnail', 'thumb']
+
+/**
+ * 从解包文件中挑选一张“模型主题预览图”：
+ * 1. 包内常见封面图（preview.png / 封面.png / ysm-pack.png 等）
+ * 2. ysm.json 的默认材质（properties.default_texture）
+ * 3. ysm.json 的第一张贴图（files.player.texture[0]）
+ * 4. textures/ 目录下第一张 PNG
+ */
+export function pickPreviewImage(files: DecodedFile[]): DecodedFile | undefined {
+  const pngs = files.filter((f) => isPng(f.data))
+  const lower = (s: string) => s.toLowerCase()
+  const base = (p: string) => p.split('/').pop() || p
+  const stem = (p: string) => lower(base(p)).replace(/\.png$/, '')
+
+  // 1. 常见封面图
+  const cover = pngs.find((f) => COVER_NAMES.includes(stem(f.path)))
+  if (cover) return cover
+
+  // 2-3. ysm.json 指定
+  const ysmJson = files.find((f) => lower(f.path).endsWith('ysm.json'))
+  if (ysmJson) {
+    try {
+      const doc = JSON.parse(new TextDecoder().decode(ysmJson.data))
+      const defaultTex = String(doc?.properties?.default_texture || '').toLowerCase().replace(/\.png$/, '')
+      if (defaultTex) {
+        const hit = pngs.find((f) => stem(f.path) === defaultTex)
+        if (hit) return hit
+      }
+      const list = doc?.files?.player?.texture
+      if (Array.isArray(list) && list.length > 0) {
+        const first = typeof list[0] === 'string' ? list[0] : list[0]?.uv
+        const wanted = String(first || '').toLowerCase()
+        if (wanted) {
+          const hit = pngs.find((f) => lower(f.path) === wanted || stem(f.path) === lower(base(wanted)))
+          if (hit) return hit
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // 4. textures/ 下第一张 PNG
+  return pngs.find((f) => lower(f.path).includes('textures/')) || pngs[0]
+}
+
 export async function loadYsmFiles(url: string, format: string): Promise<DecodedFile[]> {
-  const resp = await fetch(url)
-  if (!resp.ok) throw new Error(`下载模型失败（HTTP ${resp.status}）`)
-  return decodeYsmModelFile(await resp.arrayBuffer(), format as 'ysm' | 'zip')
+  return decodeYsmModelFile(await fetchModelBuffer(url), format as 'ysm' | 'zip')
 }

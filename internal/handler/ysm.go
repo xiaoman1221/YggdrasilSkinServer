@@ -4,13 +4,18 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
+	"regexp"
 	"strconv"
+	"strings"
 
+	"YggdrasilSkinServer/config"
 	"YggdrasilSkinServer/internal/database"
 	"YggdrasilSkinServer/internal/envelope"
 	"YggdrasilSkinServer/internal/middleware"
 	"YggdrasilSkinServer/internal/model"
 	"YggdrasilSkinServer/internal/service"
+	"YggdrasilSkinServer/internal/util"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,11 +24,12 @@ import (
 type YsmHandler struct {
 	ysmSvc     *service.YsmService
 	profileSvc *service.ProfileService
+	cfg        *config.Config
 }
 
 // NewYsmHandler 创建 YsmHandler。
-func NewYsmHandler(ysmSvc *service.YsmService, profileSvc *service.ProfileService) *YsmHandler {
-	return &YsmHandler{ysmSvc: ysmSvc, profileSvc: profileSvc}
+func NewYsmHandler(ysmSvc *service.YsmService, profileSvc *service.ProfileService, cfg *config.Config) *YsmHandler {
+	return &YsmHandler{ysmSvc: ysmSvc, profileSvc: profileSvc, cfg: cfg}
 }
 
 // ysmView 返回模型视图（含下载 URL）。
@@ -38,7 +44,9 @@ func ysmView(m *model.YsmModel, svc *service.YsmService) gin.H {
 		"usage_agreement": m.UsageAgreement,
 		"purchase_url":    m.PurchaseURL,
 		"price_info":      m.PriceInfo,
+		"is_free":         service.IsYsmFree(m.PriceInfo, m.PurchaseURL),
 		"url":             svc.URL(m),
+		"preview_url":     svc.PreviewURL(m),
 		"created_at":      m.CreatedAt,
 	}
 }
@@ -220,6 +228,75 @@ func (h *YsmHandler) Unbind(c *gin.Context) {
 	c.JSON(http.StatusOK, envelope.OK(gin.H{"profile": profile}))
 }
 
+// ysmFileNameRe 仅允许内容寻址文件名：64 位 hex + .ysm/.zip/.png。
+var ysmFileNameRe = regexp.MustCompile(`^[0-9a-f]{64}\.(ysm|zip|png)$`)
+
+// ServeFile GET /ysm/:file —— 模型文件与预览图的下载入口。
+//
+// 免费模型与预览图对所有人公开；付费模型仅允许作者本人、超级管理员或管理员下载
+// （购买流程走作者提供的外部链接，站点侧不开放公开下载）。
+func (h *YsmHandler) ServeFile(c *gin.Context) {
+	name := filepath.Base(c.Param("file"))
+	if !ysmFileNameRe.MatchString(name) {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	ext := strings.TrimPrefix(filepath.Ext(name), ".")
+	hash := strings.TrimSuffix(name, "."+ext)
+	path := filepath.Join(h.ysmSvc.YsmDir(), name)
+
+	// 预览图公开
+	if ext == "png" {
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		c.File(path)
+		return
+	}
+
+	ysm, err := h.ysmSvc.FindByHash(hash)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	// 免费模型（或历史遗留、无登记记录的文件）公开下载
+	if ysm == nil || service.IsYsmFree(ysm.PriceInfo, ysm.PurchaseURL) {
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		c.File(path)
+		return
+	}
+
+	// 付费模型：仅作者本人 / 超级管理员 / 管理员
+	user := optionalUser(c, h.cfg)
+	if user == nil || (user.ID != 1 && !user.HasPermission("admin") && !h.ysmSvc.UserOwnsHash(hash, user.ID)) {
+		c.Header("Cache-Control", "no-store")
+		c.Header("Content-Type", "text/plain; charset=utf-8")
+		msg := "该模型为付费模型，购买后才能下载"
+		if strings.TrimSpace(ysm.PurchaseURL) != "" {
+			msg += "\n购买链接：" + ysm.PurchaseURL
+		}
+		c.String(http.StatusForbidden, msg)
+		return
+	}
+	c.Header("Cache-Control", "private, no-store")
+	c.File(path)
+}
+
+// optionalUser 尝试从 Authorization 头解析当前用户；未携带或令牌无效时返回 nil。
+func optionalUser(c *gin.Context, cfg *config.Config) *model.User {
+	header := c.GetHeader("Authorization")
+	if header == "" || !strings.HasPrefix(header, "Bearer ") {
+		return nil
+	}
+	claims, err := util.ParseToken(cfg.JWT.Secret, strings.TrimPrefix(header, "Bearer "))
+	if err != nil {
+		return nil
+	}
+	var user model.User
+	if err := database.DB.First(&user, claims.UserID).Error; err != nil {
+		return nil
+	}
+	return &user
+}
+
 // AdminList GET /api/v1/admin/ysm —— 全部 YSM 模型（管理员）
 func (h *YsmHandler) AdminList(c *gin.Context) {
 	limit, offset := pagination(c)
@@ -248,7 +325,9 @@ func (h *YsmHandler) AdminList(c *gin.Context) {
 			"usage_agreement": m.UsageAgreement,
 			"purchase_url":    m.PurchaseURL,
 			"price_info":      m.PriceInfo,
+			"is_free":         service.IsYsmFree(m.PriceInfo, m.PurchaseURL),
 			"url":             h.ysmSvc.URL(m),
+			"preview_url":     h.ysmSvc.PreviewURL(m),
 			"created_at":      m.CreatedAt,
 		})
 	}

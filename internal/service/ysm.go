@@ -117,6 +117,12 @@ func (s *YsmService) Create(userID uint, name, description string, data []byte, 
 		PurchaseURL:    truncate(meta.PurchaseURL, 512),
 		PriceInfo:      truncate(meta.PriceInfo, 64),
 	}
+	// zip 格式尝试提取一张预览图（封面/默认材质），.ysm 加密格式无法在服务端解密
+	if format == model.YsmFormatZip {
+		if preview, ok := extractYsmPreview(data, hashHex, s.cfg.Storage.YsmDir); ok {
+			ysm.PreviewPath = preview
+		}
+	}
 	if err := s.db.Create(ysm).Error; err != nil {
 		return nil, err
 	}
@@ -212,6 +218,185 @@ func extractYsmZipInfo(data []byte) (out YsmMeta) {
 	return
 }
 
+// ysmPreviewNames 是模型包内常见封面/预览图文件名（不含 .png 后缀，忽略大小写）。
+var ysmPreviewNames = map[string]bool{
+	"ysm-pack":  true,
+	"preview":   true,
+	"预览":       true,
+	"封面":       true,
+	"cover":     true,
+	"poster":    true,
+	"thumbnail": true,
+	"thumb":     true,
+}
+
+// ysmPreviewDoc 仅解析提取预览图所需的 ysm.json 字段。
+type ysmPreviewDoc struct {
+	Properties struct {
+		DefaultTexture string `json:"default_texture"`
+	} `json:"properties"`
+	Files struct {
+		Player struct {
+			Texture []json.RawMessage `json:"texture"`
+		} `json:"player"`
+	} `json:"files"`
+}
+
+// firstTexturePath 返回 files.player.texture 中第一项对应的贴图路径。
+// 兼容两种写法：字符串路径，或 { "uv": "..." } 对象。
+func (d *ysmPreviewDoc) firstTexturePath() string {
+	for _, raw := range d.Files.Player.Texture {
+		var s string
+		if json.Unmarshal(raw, &s) == nil && s != "" {
+			return s
+		}
+		var obj struct {
+			UV string `json:"uv"`
+		}
+		if json.Unmarshal(raw, &obj) == nil && obj.UV != "" {
+			return obj.UV
+		}
+	}
+	return ""
+}
+
+// extractYsmPreview 从 zip 格式模型包中提取一张预览图（PNG），保存到 ysmDir/{hash}.png。
+// 候选顺序：
+//  1. 包内常见封面图（preview.png / 封面.png / ysm-pack.png 等，任意层级，优先根目录）
+//  2. ysm.json 的默认材质（properties.default_texture）
+//  3. ysm.json 的第一张贴图（files.player.texture[0]）
+//  4. textures/ 目录下的第一张 PNG
+//
+// .ysm 加密格式无法在服务端解密，返回 ok=false。
+func extractYsmPreview(data []byte, hash, ysmDir string) (string, bool) {
+	if len(data) < 2 || data[0] != 'P' || data[1] != 'K' {
+		return "", false
+	}
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return "", false
+	}
+
+	var (
+		doc       ysmPreviewDoc
+		parsedDoc bool
+		rootCover *zip.File
+		covers    []*zip.File // 非根目录封面
+		textures  []*zip.File // textures/ 下的 PNG
+	)
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		name := filepath.ToSlash(f.Name)
+		lower := strings.ToLower(name)
+		base := strings.ToLower(filepath.Base(name))
+		if strings.HasSuffix(base, ".png") {
+			if ysmPreviewNames[strings.TrimSuffix(base, ".png")] {
+				if !strings.Contains(lower, "/") {
+					rootCover = f
+				} else {
+					covers = append(covers, f)
+				}
+			}
+			if strings.Contains(lower, "textures/") {
+				textures = append(textures, f)
+			}
+		}
+		if base == "ysm.json" && !parsedDoc {
+			if raw, err := readZipEntry(f, 4<<20); err == nil {
+				if json.Unmarshal(raw, &doc) == nil {
+					parsedDoc = true
+				}
+			}
+		}
+	}
+
+	save := func(f *zip.File) (string, bool) {
+		raw, err := readZipEntry(f, 8<<20)
+		if err != nil || !isPngBytes(raw) {
+			return "", false
+		}
+		path := filepath.Join(ysmDir, hash+".png")
+		if err := os.MkdirAll(ysmDir, 0o755); err != nil {
+			return "", false
+		}
+		if err := os.WriteFile(path, raw, 0o644); err != nil {
+			return "", false
+		}
+		return path, true
+	}
+
+	if rootCover != nil {
+		if p, ok := save(rootCover); ok {
+			return p, true
+		}
+	}
+	for _, f := range covers {
+		if p, ok := save(f); ok {
+			return p, true
+		}
+	}
+	// 默认材质：default_texture 通常是“不含路径和后缀.png”的名称，按文件名匹配
+	if want := strings.TrimSuffix(strings.ToLower(doc.Properties.DefaultTexture), ".png"); want != "" {
+		var best *zip.File
+		for _, f := range zr.File {
+			if f.FileInfo().IsDir() {
+				continue
+			}
+			name := filepath.ToSlash(f.Name)
+			if strings.TrimSuffix(strings.ToLower(filepath.Base(name)), ".png") != want {
+				continue
+			}
+			best = f
+			if strings.Contains(strings.ToLower(name), "textures/") {
+				break
+			}
+		}
+		if best != nil {
+			if p, ok := save(best); ok {
+				return p, true
+			}
+		}
+	}
+	// 第一张贴图（files.player.texture[0]）
+	if want := strings.ToLower(filepath.ToSlash(doc.firstTexturePath())); want != "" {
+		for _, f := range zr.File {
+			if f.FileInfo().IsDir() {
+				continue
+			}
+			if strings.ToLower(filepath.ToSlash(f.Name)) == want {
+				if p, ok := save(f); ok {
+					return p, true
+				}
+				break
+			}
+		}
+	}
+	// textures/ 下第一张 PNG
+	for _, f := range textures {
+		if p, ok := save(f); ok {
+			return p, true
+		}
+	}
+	return "", false
+}
+
+// readZipEntry 读取 zip 条目内容（限制大小，防止解压炸弹）。
+func readZipEntry(f *zip.File, limit int64) ([]byte, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	return io.ReadAll(io.LimitReader(rc, limit))
+}
+
+// isPngBytes 校验 PNG 文件头。
+func isPngBytes(data []byte) bool {
+	return len(data) > 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A})
+}
+
 // AdminDelete 管理员删除模型：不校验归属，解绑引用并清理文件。
 func (s *YsmService) AdminDelete(id, actorID uint) error {
 	var ysm model.YsmModel
@@ -228,6 +413,11 @@ func (s *YsmService) AdminDelete(id, actorID uint) error {
 	if count == 0 {
 		if _, err := os.Stat(ysm.Path); err == nil {
 			os.Remove(ysm.Path)
+		}
+		if ysm.PreviewPath != "" {
+			if _, err := os.Stat(ysm.PreviewPath); err == nil {
+				os.Remove(ysm.PreviewPath)
+			}
 		}
 	}
 	_ = actorID // 审计信息由 handler 写入
@@ -274,6 +464,11 @@ func (s *YsmService) Delete(id, ownerID uint) error {
 		if _, err := os.Stat(ysm.Path); err == nil {
 			os.Remove(ysm.Path)
 		}
+		if ysm.PreviewPath != "" {
+			if _, err := os.Stat(ysm.PreviewPath); err == nil {
+				os.Remove(ysm.PreviewPath)
+			}
+		}
 	}
 	return nil
 }
@@ -282,6 +477,55 @@ func (s *YsmService) Delete(id, ownerID uint) error {
 func (s *YsmService) URL(ysm *model.YsmModel) string {
 	base := strings.TrimRight(s.settings.Get(model.SettingSiteURL, s.cfg.Storage.BaseURL), "/")
 	return base + "/ysm/" + ysm.Hash + "." + ysm.Format
+}
+
+// PreviewURL 返回模型预览图的公开 URL；未提取到预览图时返回空字符串。
+func (s *YsmService) PreviewURL(ysm *model.YsmModel) string {
+	if ysm.PreviewPath == "" {
+		return ""
+	}
+	base := strings.TrimRight(s.settings.Get(model.SettingSiteURL, s.cfg.Storage.BaseURL), "/")
+	return base + "/ysm/" + ysm.Hash + ".png"
+}
+
+// YsmDir 返回 YSM 模型文件的存储目录。
+func (s *YsmService) YsmDir() string {
+	return s.cfg.Storage.YsmDir
+}
+
+// FindByHash 按内容 hash 查询模型记录；未找到时返回 (nil, nil)。
+func (s *YsmService) FindByHash(hash string) (*model.YsmModel, error) {
+	var ysm model.YsmModel
+	err := s.db.Where("hash = ?", hash).First(&ysm).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &ysm, nil
+}
+
+// UserOwnsHash 判断用户是否拥有对应 hash 的模型记录（同一文件可被多人上传）。
+func (s *YsmService) UserOwnsHash(hash string, userID uint) bool {
+	var count int64
+	s.db.Model(&model.YsmModel{}).Where("hash = ? AND user_id = ?", hash, userID).Count(&count)
+	return count > 0
+}
+
+// IsYsmFree 判断模型是否免费（免费模型允许公开下载）。
+// 判定规则：资费说明含“免费 / free / cc0”等宽松标记；或既无资费说明也无购买链接。
+func IsYsmFree(priceInfo, purchaseURL string) bool {
+	p := strings.ToLower(strings.TrimSpace(priceInfo))
+	if p == "" {
+		return strings.TrimSpace(purchaseURL) == ""
+	}
+	for _, kw := range []string{"免费", "free", "cc0"} {
+		if strings.Contains(p, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 // detectYsmFormat 根据文件内容识别 YSM 模型格式：

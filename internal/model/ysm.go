@@ -25,6 +25,8 @@ type YsmModel struct {
 	Hash string `gorm:"size:64;index" json:"hash"`
 	// Path 本地存储路径
 	Path string `gorm:"size:512" json:"-"`
+	// PreviewPath 提取的模型预览图（PNG）本地存储路径，zip 格式上传时自动提取
+	PreviewPath string `gorm:"size:512" json:"-"`
 	// Size 文件大小（字节）
 	Size int64 `json:"size"`
 	// Description 用户填写的模型描述

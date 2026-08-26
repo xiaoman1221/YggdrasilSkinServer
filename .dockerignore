@@ -1,0 +1,14 @@
+﻿# VCS / IDE
+.git
+.gitignore
+.idea
+.vscode
+
+# 本地运行数据与调试用临时解压目录
+data/
+.tmp_model/
+*.log
+
+# 前端依赖与构建产物（镜像内重新构建，无需发送到构建上下文）
+web/node_modules/
+web/dist/

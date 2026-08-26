@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { Box, CircleDollarSign, Download, ImagePlus, Pencil, Trash2, Upload, UserRound } from 'lucide-react'
-import { Profile, profileApi, Texture, textureUrl, wardrobeApi, ysmApi, YsmModel } from '../api/profile'
+import { Profile, profileApi, Texture, textureUrl, wardrobeApi, ysmApi, YsmModel, downloadYsmFile } from '../api/profile'
 import { authApi } from '../api/auth'
 import { useAuth } from '../stores/auth'
 import { useToast } from '../components/Toast'
@@ -8,9 +8,59 @@ import { Button, Field, Input, Modal, Segmented, Spinner, StatusTag, Textarea, T
 import { PreviewCard } from '../components/PreviewCard'
 import { ProfilePicker } from '../components/ProfilePicker'
 import type { YsmPreviewTarget } from '../components/YsmPreviewModal'
+import { loadYsmFiles, pickPreviewImage } from '../lib/ysmModel'
 // 懒加载预览弹窗，three.js/jszip 只在首次预览时下载
 const YsmPreviewModal = lazy(() => import('../components/YsmPreviewModal'))
 import { formatSize } from '../utils/format'
+
+// 按模型 id 缓存客户端提取的预览 blob URL：.ysm 加密模型由前端解密兜底，避免列表页重复下载解码
+const ysmPreviewCache = new Map<number, string>()
+
+/** YSM 模型卡片预览图：优先使用服务端提取的 preview_url，否则前端解包提取一张预览图。 */
+function YsmCardPreview({ model }: { model: YsmModel }) {
+  const [src, setSrc] = useState<string | null>(() => model.preview_url || ysmPreviewCache.get(model.id) || null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (model.preview_url || src || failed) return
+    if (ysmPreviewCache.has(model.id)) {
+      setSrc(ysmPreviewCache.get(model.id)!)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const files = await loadYsmFiles(model.url, model.format)
+        const cover = pickPreviewImage(files)
+        if (!cover) {
+          if (!cancelled) setFailed(true)
+          return
+        }
+        const objectUrl = URL.createObjectURL(new Blob([cover.data.slice().buffer as ArrayBuffer], { type: 'image/png' }))
+        ysmPreviewCache.set(model.id, objectUrl)
+        if (!cancelled) setSrc(objectUrl)
+      } catch {
+        if (!cancelled) setFailed(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [model, src, failed])
+
+  if (!src || failed) {
+    return (
+      <div className="ysm-icon">
+        <Box size={30} strokeWidth={1.25} />
+      </div>
+    )
+  }
+  return (
+    <div className="ysm-icon">
+      <img src={src} alt="" className="ysm-preview-img" loading="lazy" />
+    </div>
+  )
+}
 
 export default function Wardrobe() {
   const { refreshUser } = useAuth()
@@ -331,9 +381,7 @@ export default function Wardrobe() {
         <div className="grid" style={{ marginTop: 16 }}>
           {ysmModels.map((m) => (
             <div key={m.id} className="ysm-card">
-              <div className="ysm-icon">
-                <Box size={30} strokeWidth={1.25} />
-              </div>
+              <YsmCardPreview model={m} />
               <div className="pcard-body">
                 <div className="pcard-title">
                   <span className="mono">{m.name}</span>
@@ -341,7 +389,7 @@ export default function Wardrobe() {
                     {m.format === 'ysm' ? 'YSM' : 'ZIP'}
                   </StatusTag>
                   {m.price_info ? (
-                    <StatusTag kind={m.price_info.includes('免费') ? 'on' : 'warn'}>{m.price_info}</StatusTag>
+                    <StatusTag kind={m.is_free ? 'on' : 'warn'}>{m.price_info}</StatusTag>
                   ) : null}
                 </div>
                 <div className="pcard-meta">
@@ -366,10 +414,14 @@ export default function Wardrobe() {
                       获取
                     </a>
                   ) : null}
-                  <a className="link-btn" href={m.url} download>
+                  <TextLink
+                    onClick={() => {
+                      downloadYsmFile(m).catch((err: any) => toast.show(err?.message || '下载失败', 'err'))
+                    }}
+                  >
                     <Download size={13} strokeWidth={1.5} />
                     下载
-                  </a>
+                  </TextLink>
                   <TextLink onClick={() => openYsmEdit(m)}>
                     <Pencil size={13} strokeWidth={1.5} />
                     信息
@@ -661,4 +713,3 @@ export default function Wardrobe() {
     </div>
   )
 }
-

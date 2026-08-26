@@ -425,33 +425,33 @@ export default function Wardrobe() {
                     <>
                       <TextLink onClick={() => setPickerFor(t)}>
                         <ImagePlus size={13} strokeWidth={1.5} />
-                        设为皮肤
+                        <span className="lnk-txt">设为皮肤</span>
                       </TextLink>
                       <TextLink onClick={() => setAsAvatar(t)}>
                         <UserRound size={13} strokeWidth={1.5} />
-                        设为头像
+                        <span className="lnk-txt">设为头像</span>
                       </TextLink>
                     </>
                   ) : null}
                   {t.type === 'skin' && !t.library_item ? (
                     <TextLink onClick={() => setLibFor(t)}>
                       <Store size={13} strokeWidth={1.5} />
-                      申请入库
+                      <span className="lnk-txt">申请入库</span>
                     </TextLink>
                   ) : null}
                   {t.type === 'skin' && (t.library_item?.status === 'pending' || t.library_item?.status === 'rejected') ? (
                     <TextLink onClick={() => withdrawSkinSubmission(t)}>
                       <XCircle size={13} strokeWidth={1.5} />
-                      撤回申请
+                      <span className="lnk-txt">撤回申请</span>
                     </TextLink>
                   ) : null}
                   <TextLink onClick={() => openTexEdit(t)}>
                     <Pencil size={13} strokeWidth={1.5} />
-                    信息
+                    <span className="lnk-txt">信息</span>
                   </TextLink>
                   <TextLink danger onClick={() => removeTexture(t)}>
                     <Trash2 size={13} strokeWidth={1.5} />
-                    删除
+                    <span className="lnk-txt">删除</span>
                   </TextLink>
                 </>
               }
@@ -522,16 +522,16 @@ export default function Wardrobe() {
                 <div className="pcard-actions">
                   <TextLink onClick={() => setPreviewFor(m)}>
                     <Box size={13} strokeWidth={1.5} />
-                    预览
+                    <span className="lnk-txt">预览</span>
                   </TextLink>
                   <TextLink onClick={() => setYsmPickerFor(m)}>
                     <ImagePlus size={13} strokeWidth={1.5} />
-                    设为模型
+                    <span className="lnk-txt">设为模型</span>
                   </TextLink>
                   {m.purchase_url ? (
                     <a className="link-btn" href={m.purchase_url} target="_blank" rel="noreferrer">
                       <CircleDollarSign size={13} strokeWidth={1.5} />
-                      获取
+                      <span className="lnk-txt">获取</span>
                     </a>
                   ) : null}
                   <TextLink
@@ -540,27 +540,27 @@ export default function Wardrobe() {
                     }}
                   >
                     <Download size={13} strokeWidth={1.5} />
-                    下载
+                    <span className="lnk-txt">下载</span>
                   </TextLink>
                   <TextLink onClick={() => openYsmEdit(m)}>
                     <Pencil size={13} strokeWidth={1.5} />
-                    信息
+                    <span className="lnk-txt">信息</span>
                   </TextLink>
                   {!m.library_item ? (
                     <TextLink onClick={() => setYsmLibFor(m)}>
                       <Store size={13} strokeWidth={1.5} />
-                      申请入库
+                      <span className="lnk-txt">申请入库</span>
                     </TextLink>
                   ) : null}
                   {m.library_item?.status === 'pending' || m.library_item?.status === 'rejected' ? (
                     <TextLink onClick={() => withdrawYsmSubmission(m)}>
                       <XCircle size={13} strokeWidth={1.5} />
-                      撤回申请
+                      <span className="lnk-txt">撤回申请</span>
                     </TextLink>
                   ) : null}
                   <TextLink danger onClick={() => removeYsm(m)}>
                     <Trash2 size={13} strokeWidth={1.5} />
-                    删除
+                    <span className="lnk-txt">删除</span>
                   </TextLink>
                 </div>
               </div>

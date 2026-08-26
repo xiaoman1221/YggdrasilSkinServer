@@ -869,7 +869,16 @@ body {
   margin-top: 10px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 10px 8px;
+  /* 以操作区宽度为基准做容器查询：宽度不足时隐藏按钮文字 */
+  container-type: inline-size;
+}
+
+@container (max-width: 360px) {
+  .pcard-actions .lnk-txt {
+    display: none;
+  }
 }
 
 /* ---------- YSM 模型卡片 ---------- */

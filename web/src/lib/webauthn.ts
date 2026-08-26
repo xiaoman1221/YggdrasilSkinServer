@@ -17,9 +17,13 @@ function bytesToBase64Url(buf: ArrayBuffer | Uint8Array): string {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-/** 把服务端 JSON 选项中的 base64url 字段解码为浏览器需要的字节数组。 */
+/**
+ * 把服务端 JSON 选项解码为浏览器需要的字节数组。
+ * 服务端返回的是 { publicKey: {...} } 包装结构（go-webauthn 的
+ * CredentialCreation/CredentialAssertion），需要先解包再解码 base64url 字段。
+ */
 export function decodePublicKeyOptions(options: any): any {
-  const out = JSON.parse(JSON.stringify(options))
+  const out = JSON.parse(JSON.stringify(options?.publicKey ?? options))
   if (out.challenge) out.challenge = base64UrlToBytes(out.challenge)
   if (out.user?.id) out.user.id = base64UrlToBytes(out.user.id)
   if (Array.isArray(out.excludeCredentials)) {

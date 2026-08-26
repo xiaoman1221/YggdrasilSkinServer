@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,10 +23,93 @@ import (
 // tokenTTL 是 Yggdrasil accessToken 的有效期。
 const tokenTTL = 30 * 24 * time.Hour
 
+// LenientInt 是宽松整数：兼容 JSON 数字与数字字符串（部分启动器发送 "version":"1"）。
+type LenientInt int
+
+// UnmarshalJSON 实现宽松整数解析。
+func (v *LenientInt) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*v = LenientInt(n)
+		return nil
+	}
+	var f float64
+	if err := json.Unmarshal(data, &f); err == nil {
+		*v = LenientInt(f)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64); err == nil {
+			*v = LenientInt(parsed)
+			return nil
+		}
+	}
+	return errors.New("invalid integer value")
+}
+
+// LenientBool 是宽松布尔：兼容 JSON 布尔与 "true"/"false"/"1"/"0" 字符串。
+type LenientBool bool
+
+// UnmarshalJSON 实现宽松布尔解析。
+func (b *LenientBool) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var v bool
+	if err := json.Unmarshal(data, &v); err == nil {
+		*b = LenientBool(v)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "true", "1", "yes", "on":
+			*b = true
+		default:
+			*b = false
+		}
+		return nil
+	}
+	var n float64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*b = n != 0
+		return nil
+	}
+	return errors.New("invalid boolean value")
+}
+
+// ProfileRef 是 Yggdrasil 协议中的档案引用，兼容两种 selectedProfile 格式：
+// - 标准（Mojang/authlib-injector）发送 UUID 字符串
+// - 部分客户端发送 {id, name} 对象
+type ProfileRef struct {
+	ID   string
+	Name string
+}
+
+// UnmarshalJSON 先按 UUID 字符串解析，失败再按 {id, name} 对象解析。
+func (p *ProfileRef) UnmarshalJSON(data []byte) error {
+	var id string
+	if err := json.Unmarshal(data, &id); err == nil {
+		p.ID = id
+		return nil
+	}
+	var g GameProfile
+	if err := json.Unmarshal(data, &g); err == nil {
+		p.ID = g.ID
+		p.Name = g.Name
+		return nil
+	}
+	return errors.New("selectedProfile must be a UUID string or {id,name} object")
+}
+
 // Agent 是 Yggdrasil authenticate 请求中的客户端信息。
 type Agent struct {
-	Name    string `json:"name"`
-	Version int    `json:"version"`
+	Name    string     `json:"name"`
+	Version LenientInt `json:"version"`
 }
 
 // AuthenticateRequest 对应 POST authserver/authenticate 的请求体。
@@ -33,7 +117,7 @@ type AuthenticateRequest struct {
 	Username        string       `json:"username"`
 	Password        string       `json:"password"`
 	ClientToken     string       `json:"clientToken"`
-	RequestUser     bool         `json:"requestUser"`
+	RequestUser     LenientBool  `json:"requestUser"`
 	Agent           *Agent       `json:"agent"`
 	SelectedProfile *GameProfile `json:"selectedProfile"`
 }
@@ -42,7 +126,7 @@ type AuthenticateRequest struct {
 type RefreshRequest struct {
 	AccessToken     string       `json:"accessToken"`
 	ClientToken     string       `json:"clientToken"`
-	RequestUser     bool         `json:"requestUser"`
+	RequestUser     LenientBool  `json:"requestUser"`
 	SelectedProfile *GameProfile `json:"selectedProfile"`
 }
 
@@ -66,9 +150,9 @@ type InvalidateRequest struct {
 
 // JoinRequest 对应 POST sessionserver/session/minecraft/join 的请求体。
 type JoinRequest struct {
-	AccessToken     string       `json:"accessToken"`
-	SelectedProfile *GameProfile `json:"selectedProfile"`
-	ServerID        string       `json:"serverId"`
+	AccessToken     string      `json:"accessToken"`
+	SelectedProfile *ProfileRef `json:"selectedProfile"`
+	ServerID        string      `json:"serverId"`
 }
 
 // GameProfile 是 Yggdrasil 协议中的游戏档案。
@@ -183,7 +267,7 @@ func (s *YggdrasilService) Authenticate(req *AuthenticateRequest, ip, userAgent 
 		s.db.Logger.Error(nil, "record login failed: %v", err)
 	}
 
-	return http.StatusOK, s.authResponse(token, req.ClientToken, req.RequestUser, profiles, selected, &user)
+	return http.StatusOK, s.authResponse(token, req.ClientToken, bool(req.RequestUser), profiles, selected, &user)
 }
 
 // Refresh 刷新 accessToken。
@@ -222,7 +306,7 @@ func (s *YggdrasilService) Refresh(req *RefreshRequest) (int, gin.H) {
 		return yggdrasilError(http.StatusInternalServerError, "InternalServerError", err.Error())
 	}
 
-	return http.StatusOK, s.authResponse(newToken, req.ClientToken, req.RequestUser, profiles, selected, &user)
+	return http.StatusOK, s.authResponse(newToken, req.ClientToken, bool(req.RequestUser), profiles, selected, &user)
 }
 
 // Validate 校验 accessToken 是否有效。
@@ -280,7 +364,7 @@ func (s *YggdrasilService) SessionProfile(uuid string) (int, any) {
 
 // Join 处理服务端加入请求（记录 serverId）。
 func (s *YggdrasilService) Join(req *JoinRequest) (int, gin.H) {
-	if req == nil || req.AccessToken == "" || req.SelectedProfile == nil || req.ServerID == "" {
+	if req == nil || req.AccessToken == "" || req.SelectedProfile == nil || req.SelectedProfile.ID == "" || req.ServerID == "" {
 		return yggdrasilError(http.StatusBadRequest, "IllegalArgumentException", "accessToken, selectedProfile and serverId are required")
 	}
 
@@ -612,6 +696,4 @@ func (s *YggdrasilService) TexturesPayload(p *model.Profile) string {
 func yggdrasilError(status int, errorType, message string) (int, gin.H) {
 	return status, gin.H{"error": errorType, "errorMessage": message}
 }
-
-
 

@@ -34,7 +34,7 @@ func NewYsmHandler(ysmSvc *service.YsmService, profileSvc *service.ProfileServic
 
 // ysmView 返回模型视图（含下载 URL）。
 func ysmView(m *model.YsmModel, svc *service.YsmService) gin.H {
-	return gin.H{
+	view := gin.H{
 		"id":              m.ID,
 		"name":            m.Name,
 		"format":          m.Format,
@@ -49,6 +49,14 @@ func ysmView(m *model.YsmModel, svc *service.YsmService) gin.H {
 		"preview_url":     svc.PreviewURL(m),
 		"created_at":      m.CreatedAt,
 	}
+	if m.LibraryItem != nil {
+		view["library_item"] = gin.H{
+			"id":     m.LibraryItem.ID,
+			"status": m.LibraryItem.Status,
+			"title":  m.LibraryItem.Title,
+		}
+	}
+	return view
 }
 
 // List GET /api/v1/wardrobe/ysm
@@ -344,6 +352,189 @@ func (h *YsmHandler) AdminDelete(c *gin.Context) {
 	}
 	// 管理员删除：不校验归属（admin 拥有全部权限），并记录审计
 	if err := h.ysmSvc.AdminDelete(uint(id), actor.ID); err != nil {
+		writeEnvelopeError(c, envelope.CodeNotFound, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(nil))
+}
+
+/* ================= 公共皮肤库（YSM 模型） ================= */
+
+// ysmLibraryItemView 返回公共皮肤库 YSM 条目视图。
+func (h *YsmHandler) ysmLibraryItemView(item *model.YsmLibraryItem) gin.H {
+	tags := make([]string, 0, len(item.Tags))
+	for _, t := range item.Tags {
+		tags = append(tags, t.Name)
+	}
+	view := gin.H{
+		"id":              item.ID,
+		"title":           item.Title,
+		"status":          item.Status,
+		"author":          item.AuthorID,
+		"usage_agreement": item.UsageAgreement,
+		"price_info":      item.PriceInfo,
+		"purchase_url":    item.PurchaseURL,
+		"is_free":         item.PriceInfo == service.YsmPriceFree,
+		"tags":            tags,
+		"created_at":      item.CreatedAt,
+	}
+	if item.Model != nil {
+		view["model"] = ysmView(item.Model, h.ysmSvc)
+	}
+	return view
+}
+
+// SubmitLibrary POST /api/v1/wardrobe/ysm/{model_id}/library-submission —— 提交模型到公共皮肤库
+func (h *YsmHandler) SubmitLibrary(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("model_id"), 10, 64)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid model id")
+		return
+	}
+	var req struct {
+		Title          string   `json:"title"`
+		UsageAgreement string   `json:"usage_agreement"`
+		PriceInfo      string   `json:"price_info"`
+		PurchaseURL    string   `json:"purchase_url"`
+		Tags           []string `json:"tags"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
+		return
+	}
+	item, err := h.ysmSvc.SubmitToLibrary(user.ID, uint(id), req.Title, req.UsageAgreement, req.PriceInfo, req.PurchaseURL, req.Tags)
+	if err != nil {
+		code := envelope.CodeBadRequest
+		if errors.Is(err, service.ErrModelAlreadySubmitted) {
+			code = envelope.CodeConflict
+		}
+		writeEnvelopeError(c, code, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"item": h.ysmLibraryItemView(item)}))
+}
+
+// RemoveSubmission DELETE /api/v1/wardrobe/ysm/{model_id}/library-submission —— 撤回入库申请
+func (h *YsmHandler) RemoveSubmission(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("model_id"), 10, 64)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid model id")
+		return
+	}
+	if err := h.ysmSvc.RemoveLibrarySubmission(user.ID, uint(id)); err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(nil))
+}
+
+// LibraryTags GET /api/v1/ysm-library/tags —— 公共皮肤库标签（皮肤与 YSM 共用）
+func (h *YsmHandler) LibraryTags(c *gin.Context) {
+	tags, err := h.ysmSvc.ListTags()
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"tags": tags}))
+}
+
+// LibraryList GET /api/v1/ysm-library/models —— 公共皮肤库 YSM 列表
+func (h *YsmHandler) LibraryList(c *gin.Context) {
+	limit, offset := pagination(c)
+	// 公开列表仅展示已审核通过的内容，不暴露 pending/rejected 等状态
+	items, total, err := h.ysmSvc.ListLibrary(model.LibraryStatusApproved, c.Query("tag"), c.Query("keyword"), limit, offset)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	views := make([]gin.H, 0, len(items))
+	for i := range items {
+		views = append(views, h.ysmLibraryItemView(&items[i]))
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"items": views, "total": total}))
+}
+
+// LibraryGet GET /api/v1/ysm-library/models/{item_id}
+func (h *YsmHandler) LibraryGet(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("item_id"), 10, 64)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid item id")
+		return
+	}
+	item, err := h.ysmSvc.GetLibraryItem(uint(id))
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeNotFound, "model not found")
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"item": h.ysmLibraryItemView(item)}))
+}
+
+// LibraryCopy POST /api/v1/ysm-library/models/{item_id}/copy —— 复制到我的仓库
+func (h *YsmHandler) LibraryCopy(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("item_id"), 10, 64)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid item id")
+		return
+	}
+	ysm, err := h.ysmSvc.CopyLibraryItemToUser(user.ID, uint(id))
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"model": ysmView(ysm, h.ysmSvc)}))
+}
+
+// AdminLibraryList GET /api/v1/admin/ysm-library/models —— 公共皮肤库 YSM 审核列表
+func (h *YsmHandler) AdminLibraryList(c *gin.Context) {
+	limit, offset := pagination(c)
+	items, total, err := h.ysmSvc.ListLibrary(c.Query("status"), c.Query("tag"), c.Query("keyword"), limit, offset)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	views := make([]gin.H, 0, len(items))
+	for i := range items {
+		views = append(views, h.ysmLibraryItemView(&items[i]))
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"items": views, "total": total}))
+}
+
+// AdminLibraryStatus POST /api/v1/admin/ysm-library/models/{item_id}/{action}
+func (h *YsmHandler) AdminLibraryStatus(c *gin.Context) {
+	actor, _ := middleware.CurrentUser(c)
+	id, err := strconv.ParseUint(c.Param("item_id"), 10, 64)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid item id")
+		return
+	}
+	var status string
+	switch c.Param("action") {
+	case "approve":
+		status = model.LibraryStatusApproved
+	case "reject":
+		status = model.LibraryStatusRejected
+	case "unpublish":
+		status = model.LibraryStatusUnpublished
+	default:
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid action")
+		return
+	}
+	if err := h.ysmSvc.SetLibraryStatus(uint(id), status, actor.ID); err != nil {
 		writeEnvelopeError(c, envelope.CodeNotFound, err.Error())
 		return
 	}

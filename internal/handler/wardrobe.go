@@ -28,8 +28,9 @@ func NewWardrobeHandler(textureSvc *service.TextureService, librarySvc *service.
 }
 
 type submitLibraryRequest struct {
-	Title string   `json:"title"`
-	Tags  []string `json:"tags"`
+	Title          string   `json:"title"`
+	UsageAgreement string   `json:"usage_agreement"`
+	Tags           []string `json:"tags"`
 }
 
 // List GET /api/v1/wardrobe/textures
@@ -172,7 +173,7 @@ func (h *WardrobeHandler) SubmitLibrary(c *gin.Context) {
 		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
 		return
 	}
-	item, err := h.librarySvc.Submit(user.ID, uint(id), req.Title, req.Tags)
+	item, err := h.librarySvc.Submit(user.ID, uint(id), req.Title, req.UsageAgreement, req.Tags)
 	if err != nil {
 		code := envelope.CodeBadRequest
 		if errors.Is(err, service.ErrAlreadySubmitted) {
@@ -217,9 +218,10 @@ func (h *WardrobeHandler) textureView(t *model.Texture) gin.H {
 	}
 	if t.LibraryItem != nil {
 		view["library_item"] = gin.H{
-			"id":     t.LibraryItem.ID,
-			"status": t.LibraryItem.Status,
-			"title":  t.LibraryItem.Title,
+			"id":              t.LibraryItem.ID,
+			"status":          t.LibraryItem.Status,
+			"title":           t.LibraryItem.Title,
+			"usage_agreement": t.LibraryItem.UsageAgreement,
 		}
 	}
 	return view

@@ -36,7 +36,8 @@ func (h *TextureLibraryHandler) Tags(c *gin.Context) {
 // List GET /api/v1/texture-library/textures
 func (h *TextureLibraryHandler) List(c *gin.Context) {
 	limit, offset := pagination(c)
-	items, total, err := h.librarySvc.ListTextures(c.Query("status"), c.Query("tag"), c.Query("keyword"), limit, offset)
+	// 公开列表仅展示已审核通过的内容，不暴露 pending/rejected 等状态
+	items, total, err := h.librarySvc.ListTextures(model.LibraryStatusApproved, c.Query("tag"), c.Query("keyword"), limit, offset)
 	if err != nil {
 		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
 		return
@@ -117,11 +118,12 @@ func (h *TextureLibraryHandler) itemViews(items []model.TextureLibraryItem) []gi
 // itemView 转换单个条目视图（含纹理 URL）。
 func (h *TextureLibraryHandler) itemView(item *model.TextureLibraryItem) gin.H {
 	view := gin.H{
-		"id":         item.ID,
-		"title":      item.Title,
-		"status":     item.Status,
-		"author":     item.AuthorID,
-		"created_at": item.CreatedAt,
+		"id":              item.ID,
+		"title":           item.Title,
+		"status":          item.Status,
+		"author":          item.AuthorID,
+		"usage_agreement": item.UsageAgreement,
+		"created_at":      item.CreatedAt,
 	}
 	tags := make([]string, 0, len(item.Tags))
 	for _, t := range item.Tags {

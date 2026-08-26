@@ -30,6 +30,8 @@ type TextureLibraryItem struct {
 	TextureID uint   `gorm:"uniqueIndex" json:"texture_id"`
 	AuthorID  uint   `gorm:"index" json:"author_id"`
 	Title     string `gorm:"size:128" json:"title"`
+	// UsageAgreement 作者的授权声明 / 使用协议（申请入库必填）
+	UsageAgreement string `gorm:"size:512" json:"usage_agreement"`
 	// Texture 关联的材质
 	Texture *Texture `gorm:"foreignKey:TextureID" json:"texture,omitempty"`
 	// Status: pending / approved / rejected / unpublished

@@ -20,13 +20,14 @@ var (
 
 // TextureLibraryService 负责公共材质库（发布、复制、举报、审核、标签）。
 type TextureLibraryService struct {
-	db  *gorm.DB
-	cfg *config.Config
+	db       *gorm.DB
+	cfg      *config.Config
+	settings *SettingService
 }
 
 // NewTextureLibraryService 创建 TextureLibraryService。
-func NewTextureLibraryService(db *gorm.DB, cfg *config.Config) *TextureLibraryService {
-	return &TextureLibraryService{db: db, cfg: cfg}
+func NewTextureLibraryService(db *gorm.DB, cfg *config.Config, settings *SettingService) *TextureLibraryService {
+	return &TextureLibraryService{db: db, cfg: cfg, settings: settings}
 }
 
 // ListTags 返回全部标签。
@@ -76,14 +77,22 @@ func (s *TextureLibraryService) GetTexture(itemID uint) (*model.TextureLibraryIt
 	return &item, nil
 }
 
-// Submit 提交 wardrobe 材质到公共材质库（待审核）。
-func (s *TextureLibraryService) Submit(userID uint, textureID uint, title string, tagNames []string) (*model.TextureLibraryItem, error) {
+// Submit 提交 wardrobe 皮肤到公共皮肤库（待审核）。
+// 仅允许皮肤；usageAgreement（授权声明/使用协议）必填。
+func (s *TextureLibraryService) Submit(userID uint, textureID uint, title, usageAgreement string, tagNames []string) (*model.TextureLibraryItem, error) {
 	var texture model.Texture
 	if err := s.db.First(&texture, textureID).Error; err != nil {
 		return nil, ErrTextureNotFound
 	}
 	if texture.UserID != userID {
 		return nil, errors.New("not allowed to submit this texture")
+	}
+	if texture.Type != model.TextureTypeSkin {
+		return nil, errors.New("公共皮肤库仅支持皮肤，披风无法申请入库")
+	}
+	usageAgreement = strings.TrimSpace(usageAgreement)
+	if usageAgreement == "" {
+		return nil, errors.New("请填写授权声明 / 使用协议")
 	}
 
 	var count int64
@@ -93,10 +102,11 @@ func (s *TextureLibraryService) Submit(userID uint, textureID uint, title string
 	}
 
 	item := &model.TextureLibraryItem{
-		TextureID: textureID,
-		AuthorID:  userID,
-		Title:     strings.TrimSpace(title),
-		Status:    model.LibraryStatusPending,
+		TextureID:      textureID,
+		AuthorID:       userID,
+		Title:          strings.TrimSpace(title),
+		UsageAgreement: truncate(usageAgreement, 512),
+		Status:         model.LibraryStatusPending,
 	}
 	for _, name := range tagNames {
 		name = strings.TrimSpace(strings.ToLower(name))
@@ -149,10 +159,43 @@ func (s *TextureLibraryService) CopyToWardrobe(userID uint, itemID uint) (*model
 		Width:  texture.Width,
 		Height: texture.Height,
 	}
+	// 已有同内容材质时直接复用，避免重复记录
+	var existing model.Texture
+	err = s.db.Where("user_id = ? AND type = ? AND hash = ?", userID, texture.Type, texture.Hash).First(&existing).Error
+	if err == nil {
+		return &existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
 	if err := s.db.Create(copied).Error; err != nil {
 		return nil, err
 	}
 	return copied, nil
+}
+
+// DistributeApproved 把审核通过的皮肤分发到所有其他用户的个人仓库（按站点设置开关）。
+func (s *TextureLibraryService) DistributeApproved(itemID uint) error {
+	if !s.settings.GetBool(model.SettingLibraryAutoDistribute, false) {
+		return nil
+	}
+	item, err := s.GetTexture(itemID)
+	if err != nil {
+		return err
+	}
+	if item.Status != model.LibraryStatusApproved || item.Texture == nil {
+		return nil
+	}
+	var userIDs []uint
+	if err := s.db.Model(&model.User{}).Where("id <> ?", item.AuthorID).Pluck("id", &userIDs).Error; err != nil {
+		return err
+	}
+	for _, uid := range userIDs {
+		if _, err := s.CopyToWardrobe(uid, item.ID); err != nil {
+			continue // 单个用户失败不阻断整体分发
+		}
+	}
+	return nil
 }
 
 // Report 举报公共材质条目。
@@ -194,6 +237,9 @@ func (s *TextureLibraryService) SetStatus(itemID uint, status string, actorID ui
 	item.Status = status
 	if err := s.db.Save(&item).Error; err != nil {
 		return err
+	}
+	if status == model.LibraryStatusApproved {
+		_ = s.DistributeApproved(itemID)
 	}
 	WriteAudit(s.db, actorID, "texture_library."+status, "texture_library_item", idToStr(itemID),
 		"status changed from "+old+" to "+status)

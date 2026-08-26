@@ -1,6 +1,6 @@
 import { request } from './client'
 import type { LoginRecord, Paged } from './auth'
-import type { LibraryItem } from './library'
+import type { LibraryItem, YsmLibraryItem } from './library'
 
 export interface SiteSettings {
   site_name: string
@@ -12,6 +12,7 @@ export interface SiteSettings {
   max_upload_size_mb: string
   allow_ysm_upload: string
   max_ysm_size_mb: string
+  library_auto_distribute: string
   upload_max_width: string
   upload_max_height: string
   yggdrasil_server_name: string
@@ -153,6 +154,12 @@ export const adminApi = {
 
   setLibraryStatus: (textureId: number, action: 'approve' | 'reject' | 'unpublish') =>
     request<void>({ method: 'POST', url: `/admin/texture-library/textures/${textureId}/${action}` }),
+
+  listYsmLibraryItems: (params?: { status?: string; limit?: number; offset?: number }) =>
+    request<PagedList<YsmLibraryItem>>({ method: 'GET', url: '/admin/ysm-library/models', params }),
+
+  setYsmLibraryStatus: (itemId: number, action: 'approve' | 'reject' | 'unpublish') =>
+    request<void>({ method: 'POST', url: `/admin/ysm-library/models/${itemId}/${action}` }),
 
   listReports: (params?: { status?: string; limit?: number; offset?: number }) =>
     request<{ reports: TextureReport[]; total: number }>({

@@ -37,6 +37,8 @@ type YsmModel struct {
 	PurchaseURL string `gorm:"size:512" json:"purchase_url"`
 	// PriceInfo 资费说明（如 免费 / 付费 / 限定授权）
 	PriceInfo string `gorm:"size:64" json:"price_info"`
+	// LibraryItem 关联的公共皮肤库条目（若有）
+	LibraryItem *YsmLibraryItem `gorm:"foreignKey:ModelID" json:"library_item,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

@@ -10,7 +10,7 @@ export interface Texture {
   width: number
   height: number
   url: string
-  library_item?: { id: number; status: string; title: string }
+  library_item?: { id: number; status: string; title: string; usage_agreement?: string }
 }
 
 export interface YsmModel {
@@ -26,6 +26,7 @@ export interface YsmModel {
   is_free: boolean
   url: string
   preview_url?: string
+  library_item?: { id: number; status: string; title: string }
   created_at: string
 }
 
@@ -110,6 +111,16 @@ export const wardrobeApi = {
 
   remove: (textureId: number) =>
     request<void>({ method: 'DELETE', url: `/wardrobe/textures/${textureId}` }),
+
+  submitLibrary: (textureId: number, data: { title: string; usage_agreement: string; tags?: string[] }) =>
+    request<{ item: unknown }>({
+      method: 'POST',
+      url: `/wardrobe/textures/${textureId}/library-submission`,
+      data,
+    }),
+
+  removeLibrarySubmission: (textureId: number) =>
+    request<void>({ method: 'DELETE', url: `/wardrobe/textures/${textureId}/library-submission` }),
 }
 
 export const ysmApi = {
@@ -147,6 +158,19 @@ export const ysmApi = {
     }),
 
   remove: (modelId: number) => request<void>({ method: 'DELETE', url: `/wardrobe/ysm/${modelId}` }),
+
+  submitLibrary: (
+    modelId: number,
+    data: { title: string; usage_agreement: string; price_info: string; purchase_url?: string; tags?: string[] },
+  ) =>
+    request<{ item: unknown }>({
+      method: 'POST',
+      url: `/wardrobe/ysm/${modelId}/library-submission`,
+      data,
+    }),
+
+  removeLibrarySubmission: (modelId: number) =>
+    request<void>({ method: 'DELETE', url: `/wardrobe/ysm/${modelId}/library-submission` }),
 }
 
 /** 生成同源纹理 URL（避免 127.0.0.1/localhost 跨域导致 WebGL 加载失败） */

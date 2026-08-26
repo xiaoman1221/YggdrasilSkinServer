@@ -40,7 +40,7 @@ export default function MainLayout() {
   const navItems = [
     { to: '/', label: '控制台', icon: <LayoutDashboard size={17} strokeWidth={1.5} />, end: true },
     { to: '/wardrobe', label: '个人皮肤', icon: <Palette size={17} strokeWidth={1.5} /> },
-    { to: '/library', label: '公共材质库', icon: <Store size={17} strokeWidth={1.5} /> },
+    { to: '/library', label: '公共皮肤库', icon: <Store size={17} strokeWidth={1.5} /> },
     { to: '/records', label: '登录记录', icon: <History size={17} strokeWidth={1.5} /> },
   ]
 

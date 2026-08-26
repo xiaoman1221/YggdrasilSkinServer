@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +24,13 @@ import (
 var (
 	ErrYsmNotFound = errors.New("ysm model not found")
 	ErrYsmInvalid  = errors.New("invalid ysm model file")
+	ErrModelAlreadySubmitted = errors.New("该模型已提交过入库申请")
+)
+
+// 公共皮肤库资费情况（提交入库时强制规范化）。
+const (
+	YsmPriceFree = "免费"
+	YsmPricePaid = "付费"
 )
 
 // YsmMeta 是模型的基础信息（使用协议/购买链接/资费）。
@@ -132,6 +140,13 @@ func (s *YsmService) Create(userID uint, name, description string, data []byte, 
 // MaxSizeBytes 返回当前站点设置的 YSM 模型大小上限（字节）。
 func (s *YsmService) MaxSizeBytes() int64 {
 	return int64(s.settings.GetInt(model.SettingMaxYsmSizeMB, 16)) * 1024 * 1024
+}
+
+// ListTags 返回公共皮肤库全部标签（皮肤与 YSM 共用 texture_tags 表）。
+func (s *YsmService) ListTags() ([]model.TextureTag, error) {
+	var tags []model.TextureTag
+	err := s.db.Order("name ASC").Find(&tags).Error
+	return tags, err
 }
 
 // UpdateMeta 更新模型基础信息（仅允许本人）。
@@ -439,7 +454,7 @@ func (s *YsmService) Get(id uint) (*model.YsmModel, error) {
 // ListByUser 返回用户全部模型（按创建时间倒序）。
 func (s *YsmService) ListByUser(userID uint) ([]model.YsmModel, error) {
 	var models []model.YsmModel
-	err := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&models).Error
+	err := s.db.Preload("LibraryItem").Where("user_id = ?", userID).Order("created_at DESC").Find(&models).Error
 	return models, err
 }
 
@@ -526,6 +541,233 @@ func IsYsmFree(priceInfo, purchaseURL string) bool {
 		}
 	}
 	return false
+}
+
+// ===== 公共皮肤库（YSM 模型）=====
+
+// normalizeYsmPrice 规范化资费情况，只允许 免费 / 付费。
+func normalizeYsmPrice(priceInfo string) (string, error) {
+	p := strings.ToLower(strings.TrimSpace(priceInfo))
+	if p == "" {
+		return "", errors.New("请填写资费情况（免费/付费）")
+	}
+	if strings.Contains(p, "免费") || strings.Contains(p, "free") || strings.Contains(p, "cc0") {
+		return YsmPriceFree, nil
+	}
+	if strings.Contains(p, "付费") || strings.Contains(p, "paid") || strings.Contains(p, "收费") || strings.Contains(p, "购买") {
+		return YsmPricePaid, nil
+	}
+	return "", errors.New("资费情况只能是「免费」或「付费」")
+}
+
+// validateYsmPurchaseURL 校验购买/赞助链接必须为 http(s) 地址。
+func validateYsmPurchaseURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	if len(raw) > 512 {
+		return errors.New("购买链接过长")
+	}
+	u, err := url.ParseRequestURI(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return errors.New("购买链接必须是合法的 http(s) 地址")
+	}
+	return nil
+}
+
+// SubmitToLibrary 提交个人 YSM 模型到公共皮肤库（待审核）。
+// 严格校验：使用协议必填、资费情况限 免费/付费、付费模型必须提供合法购买链接。
+func (s *YsmService) SubmitToLibrary(userID, modelID uint, title, usageAgreement, priceInfo, purchaseURL string, tagNames []string) (*model.YsmLibraryItem, error) {
+	var ysm model.YsmModel
+	if err := s.db.First(&ysm, modelID).Error; err != nil {
+		return nil, ErrYsmNotFound
+	}
+	if ysm.UserID != userID {
+		return nil, errors.New("not allowed to submit this model")
+	}
+	usageAgreement = strings.TrimSpace(usageAgreement)
+	if usageAgreement == "" {
+		return nil, errors.New("请填写使用协议 / 授权说明")
+	}
+	priceInfo, err := normalizeYsmPrice(priceInfo)
+	if err != nil {
+		return nil, err
+	}
+	purchaseURL = strings.TrimSpace(purchaseURL)
+	if err := validateYsmPurchaseURL(purchaseURL); err != nil {
+		return nil, err
+	}
+	if priceInfo == YsmPricePaid && purchaseURL == "" {
+		return nil, errors.New("付费模型必须提供购买链接")
+	}
+
+	var count int64
+	s.db.Model(&model.YsmLibraryItem{}).Where("model_id = ?", modelID).Count(&count)
+	if count > 0 {
+		return nil, ErrModelAlreadySubmitted
+	}
+
+	item := &model.YsmLibraryItem{
+		ModelID:        modelID,
+		AuthorID:       userID,
+		Title:          strings.TrimSpace(title),
+		UsageAgreement: truncate(usageAgreement, 512),
+		PriceInfo:      priceInfo,
+		PurchaseURL:    truncate(purchaseURL, 512),
+		Status:         model.LibraryStatusPending,
+	}
+	for _, name := range tagNames {
+		name = strings.TrimSpace(strings.ToLower(name))
+		if name == "" {
+			continue
+		}
+		tag := model.TextureTag{Name: name}
+		s.db.Where("name = ?", name).FirstOrCreate(&tag)
+		item.Tags = append(item.Tags, tag)
+	}
+	if err := s.db.Create(item).Error; err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
+// RemoveLibrarySubmission 撤回自己的 YSM 入库申请。
+func (s *YsmService) RemoveLibrarySubmission(userID, modelID uint) error {
+	var item model.YsmLibraryItem
+	err := s.db.Where("model_id = ? AND author_id = ?", modelID, userID).First(&item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return s.db.Delete(&item).Error
+}
+
+// ListLibrary 分页查询公共皮肤库 YSM 条目（默认仅已审核通过）。
+func (s *YsmService) ListLibrary(status, tag, keyword string, limit, offset int) ([]model.YsmLibraryItem, int64, error) {
+	if status == "" {
+		status = model.LibraryStatusApproved
+	}
+	q := s.db.Model(&model.YsmLibraryItem{}).Preload("Tags").Preload("Model")
+	if tag != "" {
+		q = q.Joins("JOIN ysm_library_item_tags ylit ON ylit.ysm_library_item_id = ysm_library_items.id").
+			Joins("JOIN texture_tags tt ON tt.id = ylit.texture_tag_id").
+			Where("tt.name = ?", tag)
+	}
+	if keyword != "" {
+		q = q.Where("ysm_library_items.title LIKE ?", "%"+keyword+"%")
+	}
+	q = q.Where("ysm_library_items.status = ?", status)
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var items []model.YsmLibraryItem
+	err := q.Order("ysm_library_items.created_at DESC").Limit(limit).Offset(offset).Find(&items).Error
+	return items, total, err
+}
+
+// GetLibraryItem 查询单个公共皮肤库 YSM 条目。
+func (s *YsmService) GetLibraryItem(itemID uint) (*model.YsmLibraryItem, error) {
+	var item model.YsmLibraryItem
+	err := s.db.Preload("Tags").Preload("Model").First(&item, itemID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrLibraryItemNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+// CopyLibraryItemToUser 把公共皮肤库的 YSM 模型复制到自己的仓库（文件复用，按 hash 去重）。
+func (s *YsmService) CopyLibraryItemToUser(userID, itemID uint) (*model.YsmModel, error) {
+	item, err := s.GetLibraryItem(itemID)
+	if err != nil {
+		return nil, err
+	}
+	if item.Status != model.LibraryStatusApproved {
+		return nil, errors.New("model is not available")
+	}
+	m := item.Model
+	if m == nil {
+		return nil, ErrYsmNotFound
+	}
+	// 付费模型不允许复制到他人仓库（购买走作者外部链接，避免绕过付费限制）
+	if !IsYsmFree(m.PriceInfo, m.PurchaseURL) {
+		return nil, errors.New("该模型为付费模型，请通过购买链接获取")
+	}
+	var existing model.YsmModel
+	err = s.db.Where("hash = ? AND user_id = ?", m.Hash, userID).First(&existing).Error
+	if err == nil {
+		return &existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	copied := &model.YsmModel{
+		UserID:         userID,
+		Name:           m.Name,
+		Format:         m.Format,
+		Hash:           m.Hash,
+		Path:           m.Path,
+		PreviewPath:    m.PreviewPath,
+		Size:           m.Size,
+		Description:    m.Description,
+		UsageAgreement: m.UsageAgreement,
+		PurchaseURL:    m.PurchaseURL,
+		PriceInfo:      m.PriceInfo,
+	}
+	if err := s.db.Create(copied).Error; err != nil {
+		return nil, err
+	}
+	return copied, nil
+}
+
+// DistributeLibraryItem 把审核通过的 YSM 模型分发到所有其他用户的仓库（按站点设置开关）。
+func (s *YsmService) DistributeLibraryItem(itemID uint) error {
+	if !s.settings.GetBool(model.SettingLibraryAutoDistribute, false) {
+		return nil
+	}
+	item, err := s.GetLibraryItem(itemID)
+	if err != nil {
+		return err
+	}
+	if item.Status != model.LibraryStatusApproved || item.Model == nil {
+		return nil
+	}
+	var userIDs []uint
+	if err := s.db.Model(&model.User{}).Where("id <> ?", item.AuthorID).Pluck("id", &userIDs).Error; err != nil {
+		return err
+	}
+	for _, uid := range userIDs {
+		if _, err := s.CopyLibraryItemToUser(uid, item.ID); err != nil {
+			continue // 单个用户失败不阻断整体分发
+		}
+	}
+	return nil
+}
+
+// SetLibraryStatus 修改公共皮肤库 YSM 条目状态（审核/下架），审核通过时按设置自动分发。
+func (s *YsmService) SetLibraryStatus(itemID uint, status string, actorID uint) error {
+	var item model.YsmLibraryItem
+	if err := s.db.First(&item, itemID).Error; err != nil {
+		return ErrLibraryItemNotFound
+	}
+	old := item.Status
+	item.Status = status
+	if err := s.db.Save(&item).Error; err != nil {
+		return err
+	}
+	if status == model.LibraryStatusApproved {
+		_ = s.DistributeLibraryItem(itemID)
+	}
+	WriteAudit(s.db, actorID, "ysm_library."+status, "ysm_library_item", idToStr(itemID),
+		"status changed from "+old+" to "+status)
+	return nil
 }
 
 // detectYsmFormat 根据文件内容识别 YSM 模型格式：

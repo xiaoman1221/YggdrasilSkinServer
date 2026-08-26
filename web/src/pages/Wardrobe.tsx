@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
-import { Box, CircleDollarSign, Download, ImagePlus, Pencil, Trash2, Upload, UserRound } from 'lucide-react'
+import { Box, CircleDollarSign, Download, ImagePlus, Pencil, Store, Trash2, Upload, UserRound, XCircle } from 'lucide-react'
 import { Profile, profileApi, Texture, textureUrl, wardrobeApi, ysmApi, YsmModel, downloadYsmFile } from '../api/profile'
 import { authApi } from '../api/auth'
 import { useAuth } from '../stores/auth'
@@ -79,6 +79,12 @@ export default function Wardrobe() {
   const [editTexFor, setEditTexFor] = useState<Texture | null>(null)
   const [editTexForm, setEditTexForm] = useState({ name: '', description: '' })
   const [editTexBusy, setEditTexBusy] = useState(false)
+  // 皮肤申请入库
+  const [libFor, setLibFor] = useState<Texture | null>(null)
+  const [libTitle, setLibTitle] = useState('')
+  const [libAgreement, setLibAgreement] = useState('')
+  const [libTags, setLibTags] = useState('')
+  const [libBusy, setLibBusy] = useState(false)
 
   // YSM 模型
   const [ysmModels, setYsmModels] = useState<YsmModel[]>([])
@@ -103,6 +109,14 @@ export default function Wardrobe() {
   })
   const [editYsmBusy, setEditYsmBusy] = useState(false)
   const ysmFileRef = useRef<HTMLInputElement>(null)
+  // YSM 申请入库
+  const [ysmLibFor, setYsmLibFor] = useState<YsmModel | null>(null)
+  const [ysmLibTitle, setYsmLibTitle] = useState('')
+  const [ysmLibAgreement, setYsmLibAgreement] = useState('')
+  const [ysmLibPrice, setYsmLibPrice] = useState<'免费' | '付费'>('免费')
+  const [ysmLibPurchase, setYsmLibPurchase] = useState('')
+  const [ysmLibTags, setYsmLibTags] = useState('')
+  const [ysmLibBusy, setYsmLibBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -282,6 +296,94 @@ export default function Wardrobe() {
     }
   }
 
+  async function submitSkinLibrary() {
+    if (!libFor || libBusy) return
+    if (!libAgreement.trim()) {
+      toast.show('请填写授权声明 / 使用协议', 'err')
+      return
+    }
+    setLibBusy(true)
+    try {
+      await wardrobeApi.submitLibrary(libFor.id, {
+        title: libTitle.trim() || libFor.name || '未命名皮肤',
+        usage_agreement: libAgreement.trim(),
+        tags: libTags.split(/[\s,，]+/).filter(Boolean),
+      })
+      toast.show('已提交入库申请，等待审核', 'ok')
+      setLibFor(null)
+      setLibTitle('')
+      setLibAgreement('')
+      setLibTags('')
+      load()
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '提交失败', 'err')
+    } finally {
+      setLibBusy(false)
+    }
+  }
+
+  async function withdrawSkinSubmission(t: Texture) {
+    if (!t.library_item) return
+    if (!window.confirm('确认撤回该皮肤的入库申请？')) return
+    try {
+      await wardrobeApi.removeLibrarySubmission(t.id)
+      toast.show('已撤回申请', 'ok')
+      load()
+    } catch (err: any) {
+      toast.show(err.message || '撤回失败', 'err')
+    }
+  }
+
+  async function submitYsmLibrary() {
+    if (!ysmLibFor || ysmLibBusy) return
+    if (!ysmLibAgreement.trim()) {
+      toast.show('请填写使用协议 / 授权说明', 'err')
+      return
+    }
+    if (ysmLibPurchase.trim() && !/^https?:\/\/.+/i.test(ysmLibPurchase.trim())) {
+      toast.show('购买链接必须是合法的 http(s) 地址', 'err')
+      return
+    }
+    if (ysmLibPrice === '付费' && !ysmLibPurchase.trim()) {
+      toast.show('付费模型必须提供购买链接', 'err')
+      return
+    }
+    setYsmLibBusy(true)
+    try {
+      await ysmApi.submitLibrary(ysmLibFor.id, {
+        title: ysmLibTitle.trim() || ysmLibFor.name || '未命名模型',
+        usage_agreement: ysmLibAgreement.trim(),
+        price_info: ysmLibPrice,
+        ...(ysmLibPurchase.trim() ? { purchase_url: ysmLibPurchase.trim() } : {}),
+        tags: ysmLibTags.split(/[\s,，]+/).filter(Boolean),
+      })
+      toast.show('已提交入库申请，等待审核', 'ok')
+      setYsmLibFor(null)
+      setYsmLibTitle('')
+      setYsmLibAgreement('')
+      setYsmLibPrice('免费')
+      setYsmLibPurchase('')
+      setYsmLibTags('')
+      loadYsm()
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '提交失败', 'err')
+    } finally {
+      setYsmLibBusy(false)
+    }
+  }
+
+  async function withdrawYsmSubmission(m: YsmModel) {
+    if (!m.library_item) return
+    if (!window.confirm('确认撤回该模型的入库申请？')) return
+    try {
+      await ysmApi.removeLibrarySubmission(m.id)
+      toast.show('已撤回申请', 'ok')
+      loadYsm()
+    } catch (err: any) {
+      toast.show(err.message || '撤回失败', 'err')
+    }
+  }
+
   return (
     <div>
       <header className="page-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
@@ -311,6 +413,9 @@ export default function Wardrobe() {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <StatusTag kind={t.type === 'skin' ? 'on' : 'warn'}>{t.type === 'skin' ? '皮肤' : '披风'}</StatusTag>
                   {t.name ? <span className="mono">{t.name}</span> : null}
+                  {t.library_item?.status === 'pending' ? <StatusTag kind="warn">待审核</StatusTag> : null}
+                  {t.library_item?.status === 'approved' ? <StatusTag kind="on">已入库</StatusTag> : null}
+                  {t.library_item?.status === 'rejected' ? <StatusTag kind="warn">已驳回</StatusTag> : null}
                 </span>
               }
               meta={`${t.model} · ${t.width}×${t.height} · ${t.hash.slice(0, 12)}…${t.description ? ' · ' + t.description : ''}`}
@@ -327,6 +432,18 @@ export default function Wardrobe() {
                         设为头像
                       </TextLink>
                     </>
+                  ) : null}
+                  {t.type === 'skin' && !t.library_item ? (
+                    <TextLink onClick={() => setLibFor(t)}>
+                      <Store size={13} strokeWidth={1.5} />
+                      申请入库
+                    </TextLink>
+                  ) : null}
+                  {t.type === 'skin' && (t.library_item?.status === 'pending' || t.library_item?.status === 'rejected') ? (
+                    <TextLink onClick={() => withdrawSkinSubmission(t)}>
+                      <XCircle size={13} strokeWidth={1.5} />
+                      撤回申请
+                    </TextLink>
                   ) : null}
                   <TextLink onClick={() => openTexEdit(t)}>
                     <Pencil size={13} strokeWidth={1.5} />
@@ -391,6 +508,9 @@ export default function Wardrobe() {
                   {m.price_info ? (
                     <StatusTag kind={m.is_free ? 'on' : 'warn'}>{m.price_info}</StatusTag>
                   ) : null}
+                  {m.library_item?.status === 'pending' ? <StatusTag kind="warn">待审核</StatusTag> : null}
+                  {m.library_item?.status === 'approved' ? <StatusTag kind="on">已入库</StatusTag> : null}
+                  {m.library_item?.status === 'rejected' ? <StatusTag kind="warn">已驳回</StatusTag> : null}
                 </div>
                 <div className="pcard-meta">
                   <span className="mono tabular-nums">{formatSize(m.size)}</span>
@@ -426,6 +546,18 @@ export default function Wardrobe() {
                     <Pencil size={13} strokeWidth={1.5} />
                     信息
                   </TextLink>
+                  {!m.library_item ? (
+                    <TextLink onClick={() => setYsmLibFor(m)}>
+                      <Store size={13} strokeWidth={1.5} />
+                      申请入库
+                    </TextLink>
+                  ) : null}
+                  {m.library_item?.status === 'pending' || m.library_item?.status === 'rejected' ? (
+                    <TextLink onClick={() => withdrawYsmSubmission(m)}>
+                      <XCircle size={13} strokeWidth={1.5} />
+                      撤回申请
+                    </TextLink>
+                  ) : null}
                   <TextLink danger onClick={() => removeYsm(m)}>
                     <Trash2 size={13} strokeWidth={1.5} />
                     删除
@@ -707,6 +839,102 @@ export default function Wardrobe() {
               onChange={(e) => setEditYsmForm((f) => ({ ...f, price_info: e.target.value }))}
               placeholder="免费 / 付费 / 限定授权"
             />
+          </Field>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!libFor}
+        title={`申请入库 · ${libFor?.name || '皮肤'}`}
+        onClose={() => setLibFor(null)}
+        footer={
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', width: '100%' }}>
+            <Button variant="ghost" onClick={() => setLibFor(null)}>
+              取消
+            </Button>
+            <Button variant="primary" disabled={libBusy || !libAgreement.trim()} onClick={submitSkinLibrary}>
+              {libBusy ? '提交中…' : '提交申请'}
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'grid', gap: 18 }}>
+          <Field label="展示标题" hint="显示在公共皮肤库中的名称">
+            <Input
+              className="mono"
+              value={libTitle}
+              onChange={(e) => setLibTitle(e.target.value)}
+              placeholder={libFor?.name || '未命名皮肤'}
+            />
+          </Field>
+          <Field label="授权声明 / 使用协议" hint="必填：确认你拥有该皮肤的分享/分发授权">
+            <Textarea
+              value={libAgreement}
+              onChange={(e) => setLibAgreement(e.target.value)}
+              placeholder="如：原创作品，允许站内玩家使用与修改"
+              rows={3}
+            />
+          </Field>
+          <Field label="标签" hint="空格或逗号分隔，如：furry 现代 原创">
+            <Input value={libTags} onChange={(e) => setLibTags(e.target.value)} placeholder="furry 现代" />
+          </Field>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!ysmLibFor}
+        title={`申请入库 · ${ysmLibFor?.name || '模型'}`}
+        onClose={() => setYsmLibFor(null)}
+        footer={
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', width: '100%' }}>
+            <Button variant="ghost" onClick={() => setYsmLibFor(null)}>
+              取消
+            </Button>
+            <Button variant="primary" disabled={ysmLibBusy || !ysmLibAgreement.trim()} onClick={submitYsmLibrary}>
+              {ysmLibBusy ? '提交中…' : '提交申请'}
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'grid', gap: 18 }}>
+          <Field label="展示标题" hint="显示在公共皮肤库中的名称">
+            <Input
+              className="mono"
+              value={ysmLibTitle}
+              onChange={(e) => setYsmLibTitle(e.target.value)}
+              placeholder={ysmLibFor?.name || '未命名模型'}
+            />
+          </Field>
+          <Field label="使用协议" hint="必填：如 CC BY-NC / 禁止二传 / All Rights Reserved">
+            <Textarea
+              value={ysmLibAgreement}
+              onChange={(e) => setYsmLibAgreement(e.target.value)}
+              placeholder="模型的使用与分发授权说明"
+              rows={3}
+            />
+          </Field>
+          <Field label="资费情况" hint="必填，仅允许 免费 / 付费">
+            <Segmented<'免费' | '付费'>
+              options={[
+                { value: '免费', label: '免费' },
+                { value: '付费', label: '付费' },
+              ]}
+              value={ysmLibPrice}
+              onChange={setYsmLibPrice}
+            />
+          </Field>
+          {ysmLibPrice === '付费' ? (
+            <Field label="购买链接" hint="付费模型必填，必须是 http(s) 地址（爱发电/淘宝等）">
+              <Input
+                className="mono"
+                value={ysmLibPurchase}
+                onChange={(e) => setYsmLibPurchase(e.target.value)}
+                placeholder="https://"
+              />
+            </Field>
+          ) : null}
+          <Field label="标签" hint="空格或逗号分隔">
+            <Input value={ysmLibTags} onChange={(e) => setYsmLibTags(e.target.value)} placeholder="原创 现代" />
           </Field>
         </div>
       </Modal>

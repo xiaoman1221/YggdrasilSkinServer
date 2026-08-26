@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Box, Download, Flag, Pencil, Save, Shield, Trash2 } from 'lucide-react'
 import { adminApi, AdminProfile, AdminTexture, AdminUser, AdminYsmModel, SiteSettings, TextureReport } from '../api/admin'
 import { authApi, OAuthProvider } from '../api/auth'
-import { LibraryItem } from '../api/library'
+import { LibraryItem, YsmLibraryItem } from '../api/library'
 import { downloadYsmFile } from '../api/profile'
 import { formatSize } from '../utils/format'
 import { useAuth } from '../stores/auth'
@@ -89,7 +89,7 @@ export default function Admin() {
     ...(isAdmin ? [{ value: 'profiles' as Tab, label: '档案管理' }] : []),
     ...(isAdmin ? [{ value: 'textures' as Tab, label: '材质管理' }] : []),
     ...(isAdmin ? [{ value: 'ysm' as Tab, label: '模型管理' }] : []),
-    ...(canLibrary ? [{ value: 'library' as Tab, label: '材质库审核' }] : []),
+    ...(canLibrary ? [{ value: 'library' as Tab, label: '皮肤库审核' }] : []),
   ]
   const [tab, setTab] = useState<Tab>(tabs[0]?.value || 'settings')
   const activeTab = tabs.some((t) => t.value === tab) ? tab : tabs[0]?.value
@@ -132,6 +132,7 @@ const emptySettings: SiteSettings = {
   max_upload_size_mb: '4',
   allow_ysm_upload: 'true',
   max_ysm_size_mb: '16',
+  library_auto_distribute: 'false',
   upload_max_width: '',
   upload_max_height: '',
   yggdrasil_server_name: '',
@@ -217,6 +218,7 @@ function SettingsTab() {
         max_upload_size_mb: String(Math.max(1, parseInt(form.max_upload_size_mb, 10) || 4)),
         allow_ysm_upload: String(form.allow_ysm_upload === 'true'),
         max_ysm_size_mb: String(Math.max(1, parseInt(form.max_ysm_size_mb, 10) || 16)),
+        library_auto_distribute: String(form.library_auto_distribute === 'true'),
         upload_max_width: String(Math.max(0, parseInt(form.upload_max_width, 10) || 0)),
         upload_max_height: String(Math.max(0, parseInt(form.upload_max_height, 10) || 0)),
         yggdrasil_server_name: form.yggdrasil_server_name.trim(),
@@ -348,6 +350,13 @@ function SettingsTab() {
             <Field label="YSM 模型大小上限（MB）">
               <Input className="mono" type="number" min={1} value={form.max_ysm_size_mb} onChange={(e) => set('max_ysm_size_mb', e.target.value)} />
             </Field>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 14, color: 'var(--text)' }}>审核通过后自动分发到所有玩家仓库</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>开启后，新审核通过的公共皮肤/YSM 模型会自动复制到所有用户的个人仓库（按内容去重）</div>
+            </div>
+            <Switch checked={form.library_auto_distribute === 'true'} onChange={(v) => set('library_auto_distribute', String(v))} />
           </div>
           <Field label="站点 JWT 有效期（小时）">
             <Input className="mono" type="number" min={1} value={form.jwt_expire_hours} onChange={(e) => set('jwt_expire_hours', e.target.value)} />
@@ -601,7 +610,7 @@ function UsersTab() {
       .filter((s) => s && s !== 'user')
   const scopeLabel: Record<string, string> = {
     admin: '管理员',
-    texture_library: '材质库审核',
+    texture_library: '皮肤库审核',
     user_manage: '用户管理',
   }
   async function toggleScope(u: AdminUser, scope: string) {
@@ -657,7 +666,7 @@ function UsersTab() {
             ) : null}
             <TextLink onClick={() => toggleScope(u, 'texture_library')}>
               <Box size={13} strokeWidth={1.5} />
-              {scopes(u).includes('texture_library') ? '取消材质库' : '材质库审核'}
+              {scopes(u).includes('texture_library') ? '取消皮肤库' : '皮肤库审核'}
             </TextLink>
             <TextLink onClick={() => toggleScope(u, 'user_manage')}>
               <Shield size={13} strokeWidth={1.5} />
@@ -890,7 +899,7 @@ function TexturesTab() {
         <Segmented<TexSub>
           options={[
             { value: 'all', label: '全部材质' },
-            { value: 'review', label: '材质库审核' },
+            { value: 'review', label: '皮肤库审核' },
             { value: 'reports', label: '举报处理' },
           ]}
           value={sub}
@@ -970,7 +979,7 @@ function ReviewTab() {
 
   return (
     <Panel
-      title="材质库审核"
+      title="皮肤库审核"
       extra={
         <Segmented<'all' | 'pending' | 'approved'>
           options={[
@@ -1277,16 +1286,27 @@ function YsmTab() {
   )
 }
 
-/* ================= 材质库审核（texture_library operator） ================= */
+/* ================= 皮肤库审核（texture_library operator） ================= */
 
 function LibraryTab() {
   const toast = useToast()
+  const [kind, setKind] = useState<'skin' | 'ysm'>('skin')
+
+  // 皮肤审核
   const [items, setItems] = useState<LibraryItem[]>([])
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState('pending')
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [busyId, setBusyId] = useState<number | null>(null)
+
+  // YSM 模型审核
+  const [ysmItems, setYsmItems] = useState<YsmLibraryItem[]>([])
+  const [ysmTotal, setYsmTotal] = useState(0)
+  const [ysmStatus, setYsmStatus] = useState('pending')
+  const [ysmLoading, setYsmLoading] = useState(true)
+  const [ysmPage, setYsmPage] = useState(1)
+  const [ysmBusyId, setYsmBusyId] = useState<number | null>(null)
 
   const [reports, setReports] = useState<TextureReport[]>([])
   const [reportTotal, setReportTotal] = useState(0)
@@ -1326,6 +1346,22 @@ function LibraryTab() {
     [toast],
   )
 
+  const loadYsm = useCallback(
+    async (p: number, st: string) => {
+      setYsmLoading(true)
+      try {
+        const res = await adminApi.listYsmLibraryItems({ status: st, limit: PAGE_SIZE, offset: (p - 1) * PAGE_SIZE })
+        setYsmItems(res.items || [])
+        setYsmTotal(res.total || 0)
+      } catch (err: any) {
+        toast.show(err.message || '加载失败', 'err')
+      } finally {
+        setYsmLoading(false)
+      }
+    },
+    [toast],
+  )
+
   useEffect(() => {
     load(page, status)
   }, [load, page, status])
@@ -1333,6 +1369,10 @@ function LibraryTab() {
   useEffect(() => {
     loadReports(reportPage)
   }, [loadReports, reportPage])
+
+  useEffect(() => {
+    loadYsm(ysmPage, ysmStatus)
+  }, [loadYsm, ysmPage, ysmStatus])
 
   async function act(item: LibraryItem, action: 'approve' | 'reject' | 'unpublish') {
     setBusyId(item.id)
@@ -1357,6 +1397,19 @@ function LibraryTab() {
       toast.show(err?.response?.data?.error?.message || err.message || '操作失败', 'err')
     } finally {
       setReportBusyId(null)
+    }
+  }
+
+  async function actYsm(item: YsmLibraryItem, action: 'approve' | 'reject' | 'unpublish') {
+    setYsmBusyId(item.id)
+    try {
+      await adminApi.setYsmLibraryStatus(item.id, action)
+      toast.show(action === 'approve' ? '已通过' : action === 'reject' ? '已拒绝' : '已下架', 'ok')
+      loadYsm(ysmPage, ysmStatus)
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '操作失败', 'err')
+    } finally {
+      setYsmBusyId(null)
     }
   }
 
@@ -1409,36 +1462,130 @@ function LibraryTab() {
     },
   ]
 
+  const ysmColumns: Column<YsmLibraryItem>[] = [
+    { key: 'id', title: 'ID', width: 60, align: 'right', render: (t) => <span className="data">{t.id}</span> },
+    { key: 'owner', title: '作者', width: 80, align: 'right', render: (t) => <span className="data">#{t.author}</span> },
+    {
+      key: 'preview',
+      title: '预览',
+      width: 64,
+      render: (t) =>
+        t.model?.preview_url ? (
+          <img className="thumb" src={t.model.preview_url} alt="" />
+        ) : (
+          <span className="data">—</span>
+        ),
+    },
+    { key: 'title', title: '标题', render: (t) => <span className="mono">{t.title || t.model?.name || '未命名'}</span> },
+    {
+      key: 'price',
+      title: '资费',
+      width: 70,
+      render: (t) => <StatusTag kind={t.is_free ? 'on' : 'warn'}>{t.price_info || '付费'}</StatusTag>,
+    },
+    {
+      key: 'status',
+      title: '状态',
+      width: 90,
+      render: (t) => <StatusTag kind={statusKind[t.status] || 'off'}>{statusLabel[t.status] || t.status}</StatusTag>,
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      width: 200,
+      render: (t) => (
+        <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 12 }}>
+          {t.status === 'pending' ? (
+            <>
+              <TextLink onClick={() => actYsm(t, 'approve')}>
+                {ysmBusyId === t.id ? '处理中…' : '通过'}
+              </TextLink>
+              <TextLink danger onClick={() => actYsm(t, 'reject')}>
+                拒绝
+              </TextLink>
+            </>
+          ) : t.status === 'approved' ? (
+            <TextLink danger onClick={() => actYsm(t, 'unpublish')}>
+              下架
+            </TextLink>
+          ) : null}
+        </span>
+      ),
+    },
+  ]
+
   return (
     <div style={{ display: 'grid', gap: 20 }}>
-      <Panel
-        title="材质审核"
-        extra={
-          <Segmented
-            options={[
-              { value: 'pending', label: '待审核' },
-              { value: 'approved', label: '已通过' },
-              { value: 'rejected', label: '已拒绝' },
-            ]}
-            value={status}
-            onChange={(v) => {
-              setStatus(v)
-              setPage(1)
-            }}
-          />
-        }
-      >
-        {loading ? (
-          <Spinner label="加载材质" />
-        ) : items.length === 0 ? (
-          <Empty text="没有符合条件的材质" />
-        ) : (
-          <>
-            <Table columns={columns} data={items} />
-            <Pager page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
-          </>
-        )}
-      </Panel>
+      <div>
+        <Segmented<'skin' | 'ysm'>
+          options={[
+            { value: 'skin', label: '皮肤审核' },
+            { value: 'ysm', label: 'YSM 模型审核' },
+          ]}
+          value={kind}
+          onChange={setKind}
+        />
+      </div>
+
+      {kind === 'skin' ? (
+        <Panel
+          title="皮肤审核"
+          extra={
+            <Segmented
+              options={[
+                { value: 'pending', label: '待审核' },
+                { value: 'approved', label: '已通过' },
+                { value: 'rejected', label: '已拒绝' },
+              ]}
+              value={status}
+              onChange={(v) => {
+                setStatus(v)
+                setPage(1)
+              }}
+            />
+          }
+        >
+          {loading ? (
+            <Spinner label="加载皮肤" />
+          ) : items.length === 0 ? (
+            <Empty text="没有符合条件的皮肤" />
+          ) : (
+            <>
+              <Table columns={columns} data={items} />
+              <Pager page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
+            </>
+          )}
+        </Panel>
+      ) : (
+        <Panel
+          title="YSM 模型审核"
+          extra={
+            <Segmented
+              options={[
+                { value: 'pending', label: '待审核' },
+                { value: 'approved', label: '已通过' },
+                { value: 'rejected', label: '已拒绝' },
+              ]}
+              value={ysmStatus}
+              onChange={(v) => {
+                setYsmStatus(v)
+                setYsmPage(1)
+              }}
+            />
+          }
+        >
+          {ysmLoading ? (
+            <Spinner label="加载 YSM 模型" />
+          ) : ysmItems.length === 0 ? (
+            <Empty text="没有符合条件的 YSM 模型" />
+          ) : (
+            <>
+              <Table columns={ysmColumns} data={ysmItems} />
+              <Pager page={ysmPage} total={ysmTotal} pageSize={PAGE_SIZE} onChange={setYsmPage} />
+            </>
+          )}
+        </Panel>
+      )}
 
       <Panel title="举报处理">
         {reportsLoading ? (

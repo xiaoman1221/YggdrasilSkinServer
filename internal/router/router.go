@@ -65,7 +65,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	profileSvc := service.NewProfileService(database.DB, cfg)
 	textureSvc := service.NewTextureService(database.DB, cfg, settingsSvc)
 	ysmSvc := service.NewYsmService(database.DB, cfg, settingsSvc)
-	librarySvc := service.NewTextureLibraryService(database.DB, cfg)
+	librarySvc := service.NewTextureLibraryService(database.DB, cfg, settingsSvc)
 	yggSvc := service.NewYggdrasilService(database.DB, cfg, textureSvc, loginRecordSvc, settingsSvc)
 	mailSvc := service.NewMailService(settingsSvc, cfg)
 	oauthSvc := service.NewOauthGoService(settingsSvc, cfg)
@@ -230,9 +230,11 @@ func registerV1Routes(
 		wardrobe.POST("/ysm", ysmHandler.Upload)
 		wardrobe.PUT("/ysm/:model_id", ysmHandler.UpdateMeta)
 		wardrobe.DELETE("/ysm/:model_id", ysmHandler.Delete)
+		wardrobe.POST("/ysm/:model_id/library-submission", ysmHandler.SubmitLibrary)
+		wardrobe.DELETE("/ysm/:model_id/library-submission", ysmHandler.RemoveSubmission)
 	}
 
-	// 公共材质库
+	// 公共皮肤库（皮肤）
 	library := v1.Group("/texture-library")
 	{
 		library.GET("/tags", libraryHandler.Tags)
@@ -243,6 +245,19 @@ func registerV1Routes(
 		{
 			libraryAuth.POST("/copy", libraryHandler.Copy)
 			libraryAuth.POST("/reports", libraryHandler.Report)
+		}
+	}
+
+	// 公共皮肤库（YSM 模型）
+	ysmLibrary := v1.Group("/ysm-library")
+	{
+		ysmLibrary.GET("/tags", ysmHandler.LibraryTags)
+		ysmLibrary.GET("/models", ysmHandler.LibraryList)
+		ysmLibrary.GET("/models/:item_id", ysmHandler.LibraryGet)
+
+		ysmLibraryAuth := ysmLibrary.Group("/models/:item_id", middleware.AuthRequired(cfg))
+		{
+			ysmLibraryAuth.POST("/copy", ysmHandler.LibraryCopy)
 		}
 	}
 
@@ -285,6 +300,14 @@ func registerV1Routes(
 		libAdmin.POST("/textures/:texture_id/:action", adminHandler.SetLibraryStatus)
 		libAdmin.GET("/reports", adminHandler.Reports)
 		libAdmin.POST("/reports/:report_id/:action", adminHandler.HandleReport)
+	}
+
+	// 公共皮肤库 YSM 审核（admin 或拥有 texture_library scope 的 operator）
+	ysmLibAdmin := v1.Group("/admin/ysm-library",
+		middleware.AuthRequired(cfg), middleware.RequireAnyPermission(model.PermTextureLibrary))
+	{
+		ysmLibAdmin.GET("/models", ysmHandler.AdminLibraryList)
+		ysmLibAdmin.POST("/models/:item_id/:action", ysmHandler.AdminLibraryStatus)
 	}
 
 	// 站点基础设置（超级管理员 UID=1）

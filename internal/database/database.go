@@ -70,6 +70,7 @@ func AutoMigrate() error {
 		&model.YsmModel{},
 		&model.TextureTag{},
 		&model.TextureLibraryItem{},
+		&model.YsmLibraryItem{},
 		&model.TextureReport{},
 		&model.Token{},
 		&model.Setting{},

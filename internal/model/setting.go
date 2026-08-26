@@ -21,6 +21,8 @@ const (
 	SettingMaxUploadSizeMB    = "max_upload_size_mb"
 	SettingAllowYsmUpload     = "allow_ysm_upload"  // 是否允许上传 YSM 模型
 	SettingMaxYsmSizeMB       = "max_ysm_size_mb"   // 单个 YSM 模型文件上限（MB）
+	// SettingLibraryAutoDistribute 审核通过的公共皮肤/模型是否自动分发到所有用户的个人仓库
+	SettingLibraryAutoDistribute = "library_auto_distribute"
 	SettingUploadMaxWidth     = "upload_max_width"  // 替代 YSS_UPLOAD_MAX_WIDTH
 	SettingUploadMaxHeight    = "upload_max_height" // 替代 YSS_UPLOAD_MAX_HEIGHT
 	SettingServerName         = "yggdrasil_server_name"
@@ -75,6 +77,7 @@ func DefaultSettings() map[string]string {
 		SettingMaxUploadSizeMB:    "4",
 		SettingAllowYsmUpload:     "true",
 		SettingMaxYsmSizeMB:       "16",
+		SettingLibraryAutoDistribute: "false",
 		SettingUploadMaxWidth:     "",
 		SettingUploadMaxHeight:    "",
 		SettingServerName:         "",

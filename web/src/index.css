@@ -30,6 +30,9 @@
   --r-md: 10px;
   --r-lg: 14px;
 
+  /* 全局基础字号（可在站点设置中修改，默认 16px） */
+  --fs: 16px;
+
   --font-ui: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
 
@@ -76,13 +79,14 @@
 
 html {
   height: 100%;
+  font-size: var(--fs);
 }
 
 body {
   min-height: 100%;
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 17px;
+  font-size: var(--fs);
   line-height: 1.6;
   color: var(--text-2);
   background: var(--bg);
@@ -103,7 +107,7 @@ body {
 
 .page-sub {
   margin: 6px 0 0;
-  font-size: 16px;
+  font-size: var(--fs);
   color: var(--text-3);
 }
 
@@ -119,7 +123,7 @@ body {
 
 .mono-label {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(var(--fs) - 3px);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -127,7 +131,7 @@ body {
 
 .data {
   font-family: var(--font-mono);
-  font-size: 14.5px;
+  font-size: calc(var(--fs) - 1.5px);
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
 }
@@ -152,7 +156,7 @@ body {
 
 .panel-title {
   margin: 0;
-  font-size: 17px;
+  font-size: calc(var(--fs) + 1px);
   font-weight: 600;
   color: var(--text);
 }
@@ -173,7 +177,7 @@ body {
   border-radius: var(--r-sm);
   border: 1px solid transparent;
   font-family: var(--font-ui);
-  font-size: 16px;
+  font-size: var(--fs);
   font-weight: 500;
   color: var(--text);
   background: transparent;
@@ -237,13 +241,13 @@ body {
 .btn-sm {
   height: 32px;
   padding: 0 12px;
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
 }
 
 .btn-lg {
   height: 48px;
   padding: 0 26px;
-  font-size: 17px;
+  font-size: calc(var(--fs) + 1px);
 }
 
 .link-btn {
@@ -251,7 +255,7 @@ body {
   align-items: center;
   gap: 6px;
   padding: 2px 0;
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
   color: var(--text-2);
   background: none;
   border: none;
@@ -282,7 +286,7 @@ body {
 }
 
 .field-label {
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
   font-weight: 500;
   color: var(--text-2);
 }
@@ -295,7 +299,7 @@ body {
   border: 1px solid var(--line);
   background: var(--bg-elev);
   color: var(--text);
-  font-size: 16px;
+  font-size: var(--fs);
   font-family: var(--font-ui);
   transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
 }
@@ -398,7 +402,7 @@ body {
   border-radius: 4px;
   background: transparent;
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
   color: var(--text-2);
   cursor: pointer;
   transition: background 0.2s ease-out, color 0.2s ease-out;
@@ -424,13 +428,13 @@ body {
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 16px;
+  font-size: var(--fs);
 }
 
 .table th {
   padding: 10px 18px;
   text-align: left;
-  font-size: 14px;
+  font-size: calc(var(--fs) - 2px);
   font-weight: 500;
   color: var(--text-3);
   border-bottom: 1px solid var(--line);
@@ -471,7 +475,7 @@ body {
   padding: 2px 10px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  font-size: 14px;
+  font-size: calc(var(--fs) - 2px);
   color: var(--text-3);
   background: var(--bg-muted);
   white-space: nowrap;
@@ -515,7 +519,7 @@ body {
   border-radius: var(--r-md);
   text-align: center;
   color: var(--text-3);
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
 }
 
 /* ---------- 缩略图 ---------- */
@@ -564,7 +568,7 @@ body {
 
 .modal-title {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(var(--fs) + 2px);
   font-weight: 600;
   color: var(--text);
 }
@@ -618,7 +622,7 @@ body {
   border: 1px solid var(--line);
   background: var(--bg-elev);
   box-shadow: var(--shadow-md);
-  font-size: 15.5px;
+  font-size: calc(var(--fs) - 0.5px);
   color: var(--text);
   animation: rise 0.2s ease-out;
 }
@@ -642,7 +646,7 @@ body {
   border: 1px dashed var(--line);
   border-radius: var(--r-md);
   color: var(--text-3);
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s ease-out, background 0.2s ease-out;
@@ -669,7 +673,7 @@ body {
   padding: 12px 18px;
   border-top: 1px solid var(--line);
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: calc(var(--fs) - 2px);
   font-variant-numeric: tabular-nums;
   color: var(--text-3);
 }
@@ -694,7 +698,7 @@ body {
   align-items: center;
   gap: 10px;
   font-family: var(--font-mono);
-  font-size: 17px;
+  font-size: calc(var(--fs) + 1px);
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text);
@@ -710,7 +714,7 @@ body {
 }
 
 .topbar .site-name {
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
   color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -729,12 +733,12 @@ body {
 }
 
 .topbar .user .name {
-  font-size: 15.5px;
+  font-size: calc(var(--fs) - 0.5px);
   color: var(--text-2);
 }
 
 .topbar .user .badge {
-  font-size: 13px;
+  font-size: calc(var(--fs) - 3px);
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--accent-soft);
@@ -766,7 +770,7 @@ body {
 .sidebar .side-label {
   padding: 10px 14px 4px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(var(--fs) - 3px);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -780,7 +784,7 @@ body {
   border-radius: var(--r-sm);
   color: var(--text-2);
   text-decoration: none;
-  font-size: 16px;
+  font-size: var(--fs);
   transition: background 0.15s ease-out, color 0.15s ease-out;
 }
 
@@ -838,7 +842,7 @@ body {
   bottom: 10px;
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(var(--fs) - 3px);
   color: var(--text-3);
 }
 
@@ -852,14 +856,14 @@ body {
   justify-content: space-between;
   gap: 8px;
   font-weight: 600;
-  font-size: 16px;
+  font-size: var(--fs);
   color: var(--text);
 }
 
 .pcard-meta {
   margin-top: 3px;
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: calc(var(--fs) - 2px);
   font-variant-numeric: tabular-nums;
   color: var(--text-3);
   word-break: break-all;
@@ -947,13 +951,13 @@ body {
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
   background: var(--accent-soft);
   color: var(--text-2);
-  font-size: 15.5px;
+  font-size: calc(var(--fs) - 0.5px);
 }
 
 .announcement .lbl {
   flex: none;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(var(--fs) - 3px);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent-deep);
@@ -971,7 +975,7 @@ body {
 
 .kv dt {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(var(--fs) - 3px);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -981,7 +985,7 @@ body {
 .kv dd {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
   word-break: break-all;
@@ -1057,7 +1061,7 @@ body {
 .auth-aside .tagline {
   margin: 20px 0 0;
   max-width: 45ch;
-  font-size: 17px;
+  font-size: calc(var(--fs) + 1px);
   color: var(--text-3);
 }
 
@@ -1076,7 +1080,7 @@ body {
   min-width: 0;
   border-bottom: 1px solid var(--line);
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: calc(var(--fs) - 2px);
   font-variant-numeric: tabular-nums;
   color: var(--text-3);
 }
@@ -1084,7 +1088,7 @@ body {
 .auth-aside .ep li .m {
   min-width: 44px;
   flex: none;
-  font-size: 12px;
+  font-size: calc(var(--fs) - 4px);
   letter-spacing: 0.1em;
   color: var(--accent-deep);
 }
@@ -1097,7 +1101,7 @@ body {
 .auth-aside .foot {
   margin-top: clamp(32px, 6vw, 64px);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: calc(var(--fs) - 3px);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -1160,7 +1164,7 @@ body {
 
 .auth-form .hint {
   margin: 6px 0 0;
-  font-size: 15.5px;
+  font-size: calc(var(--fs) - 0.5px);
   color: var(--text-3);
 }
 
@@ -1177,7 +1181,7 @@ body {
   gap: 8px;
   width: 100%;
   text-align: center;
-  font-size: 15px;
+  font-size: calc(var(--fs) - 1px);
   color: var(--text-3);
 }
 

@@ -129,6 +129,7 @@ const emptySettings: SiteSettings = {
   site_url: '',
   global_font_family: '',
   global_font_url: '',
+  global_font_size: '16',
   auth_bg_images: '',
   allow_register: 'true',
   allow_upload: 'true',
@@ -217,6 +218,7 @@ function SettingsTab() {
         site_url: form.site_url.trim(),
         global_font_family: form.global_font_family.trim(),
         global_font_url: form.global_font_url.trim(),
+        global_font_size: String(Math.max(12, Math.min(24, parseInt(form.global_font_size, 10) || 16))),
         auth_bg_images: JSON.stringify(parseBgImages(form.auth_bg_images)),
         allow_register: String(form.allow_register === 'true'),
         allow_upload: String(form.allow_upload === 'true'),
@@ -320,6 +322,18 @@ function SettingsTab() {
                   value={form.global_font_url}
                   onChange={(e) => set('global_font_url', e.target.value)}
                   placeholder="https://example.com/font.woff2"
+                />
+              </Field>
+            </div>
+            <div style={{ maxWidth: 200, marginTop: 14 }}>
+              <Field label="全局字号（px）" hint="默认 16；数值越大文字越大">
+                <Input
+                  className="mono"
+                  type="number"
+                  min={12}
+                  max={24}
+                  value={form.global_font_size}
+                  onChange={(e) => set('global_font_size', e.target.value)}
                 />
               </Field>
             </div>

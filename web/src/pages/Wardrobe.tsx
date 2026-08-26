@@ -424,33 +424,33 @@ export default function Wardrobe() {
                   {t.type === 'skin' ? (
                     <>
                       <TextLink onClick={() => setPickerFor(t)}>
-                        <ImagePlus size={13} strokeWidth={1.5} />
+                        <ImagePlus size="1em" strokeWidth={1.5} />
                         <span className="lnk-txt">设为皮肤</span>
                       </TextLink>
                       <TextLink onClick={() => setAsAvatar(t)}>
-                        <UserRound size={13} strokeWidth={1.5} />
+                        <UserRound size="1em" strokeWidth={1.5} />
                         <span className="lnk-txt">设为头像</span>
                       </TextLink>
                     </>
                   ) : null}
                   {t.type === 'skin' && !t.library_item ? (
                     <TextLink onClick={() => setLibFor(t)}>
-                      <Store size={13} strokeWidth={1.5} />
+                      <Store size="1em" strokeWidth={1.5} />
                       <span className="lnk-txt">申请入库</span>
                     </TextLink>
                   ) : null}
                   {t.type === 'skin' && (t.library_item?.status === 'pending' || t.library_item?.status === 'rejected') ? (
                     <TextLink onClick={() => withdrawSkinSubmission(t)}>
-                      <XCircle size={13} strokeWidth={1.5} />
+                      <XCircle size="1em" strokeWidth={1.5} />
                       <span className="lnk-txt">撤回申请</span>
                     </TextLink>
                   ) : null}
                   <TextLink onClick={() => openTexEdit(t)}>
-                    <Pencil size={13} strokeWidth={1.5} />
+                    <Pencil size="1em" strokeWidth={1.5} />
                     <span className="lnk-txt">信息</span>
                   </TextLink>
                   <TextLink danger onClick={() => removeTexture(t)}>
-                    <Trash2 size={13} strokeWidth={1.5} />
+                    <Trash2 size="1em" strokeWidth={1.5} />
                     <span className="lnk-txt">删除</span>
                   </TextLink>
                 </>
@@ -521,16 +521,16 @@ export default function Wardrobe() {
                 {m.usage_agreement ? <div className="pcard-meta">协议：{m.usage_agreement}</div> : null}
                 <div className="pcard-actions">
                   <TextLink onClick={() => setPreviewFor(m)}>
-                    <Box size={13} strokeWidth={1.5} />
+                    <Box size="1em" strokeWidth={1.5} />
                     <span className="lnk-txt">预览</span>
                   </TextLink>
                   <TextLink onClick={() => setYsmPickerFor(m)}>
-                    <ImagePlus size={13} strokeWidth={1.5} />
+                    <ImagePlus size="1em" strokeWidth={1.5} />
                     <span className="lnk-txt">设为模型</span>
                   </TextLink>
                   {m.purchase_url ? (
                     <a className="link-btn" href={m.purchase_url} target="_blank" rel="noreferrer">
-                      <CircleDollarSign size={13} strokeWidth={1.5} />
+                      <CircleDollarSign size="1em" strokeWidth={1.5} />
                       <span className="lnk-txt">获取</span>
                     </a>
                   ) : null}
@@ -539,27 +539,27 @@ export default function Wardrobe() {
                       downloadYsmFile(m).catch((err: any) => toast.show(err?.message || '下载失败', 'err'))
                     }}
                   >
-                    <Download size={13} strokeWidth={1.5} />
+                    <Download size="1em" strokeWidth={1.5} />
                     <span className="lnk-txt">下载</span>
                   </TextLink>
                   <TextLink onClick={() => openYsmEdit(m)}>
-                    <Pencil size={13} strokeWidth={1.5} />
+                    <Pencil size="1em" strokeWidth={1.5} />
                     <span className="lnk-txt">信息</span>
                   </TextLink>
                   {!m.library_item ? (
                     <TextLink onClick={() => setYsmLibFor(m)}>
-                      <Store size={13} strokeWidth={1.5} />
+                      <Store size="1em" strokeWidth={1.5} />
                       <span className="lnk-txt">申请入库</span>
                     </TextLink>
                   ) : null}
                   {m.library_item?.status === 'pending' || m.library_item?.status === 'rejected' ? (
                     <TextLink onClick={() => withdrawYsmSubmission(m)}>
-                      <XCircle size={13} strokeWidth={1.5} />
+                      <XCircle size="1em" strokeWidth={1.5} />
                       <span className="lnk-txt">撤回申请</span>
                     </TextLink>
                   ) : null}
                   <TextLink danger onClick={() => removeYsm(m)}>
-                    <Trash2 size={13} strokeWidth={1.5} />
+                    <Trash2 size="1em" strokeWidth={1.5} />
                     <span className="lnk-txt">删除</span>
                   </TextLink>
                 </div>

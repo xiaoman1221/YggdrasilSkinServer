@@ -17,6 +17,9 @@ export default function App() {
           document.documentElement.style.setProperty('--font-ui', font)
         }
         loadCustomFont(font, (info.font_url || '').trim())
+        if (info.font_size > 0) {
+          document.documentElement.style.setProperty('--fs', `${info.font_size}px`)
+        }
       })
       .catch(() => {})
   }, [])

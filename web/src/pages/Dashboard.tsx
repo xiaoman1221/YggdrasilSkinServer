@@ -162,9 +162,11 @@ export default function Dashboard() {
               </dl>
               <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
                 <button
+                  id="ygg-dnd-button"
                   type="button"
                   className="btn btn-primary"
                   draggable
+                  data-clipboard-text={apiUrl}
                   onDragStart={(e) => {
                     e.dataTransfer.setData('text/plain', apiUrl)
                     e.dataTransfer.setData('text/uri-list', apiUrl)
@@ -181,7 +183,7 @@ export default function Dashboard() {
                   style={{ width: '100%', justifyContent: 'center', gap: 8 }}
                 >
                   <GripHorizontal size={16} strokeWidth={1.5} />
-                  拖动此按钮到启动器自动配置（点击复制地址）
+                  将此按钮拖动至启动器（点击可复制地址）
                 </button>
                 <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
                   手动接入：HMCL「版本设置 → 认证服务器」选择 authlib-injector；PCL「设置 → 认证服务器」；BakaXL「账号与档案 → 服务器管理」——粘贴上方 API 地址即可。

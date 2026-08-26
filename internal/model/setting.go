@@ -18,6 +18,8 @@ const (
 	SettingGlobalFont = "global_font_family"
 	// SettingGlobalFontURL 全局界面字体的字体文件 URL（.ttf/.woff2，空表示使用系统字体）
 	SettingGlobalFontURL = "global_font_url"
+	// SettingGlobalFontSize 全局基础字号（px）
+	SettingGlobalFontSize = "global_font_size"
 	// SettingAuthBgImages 登录/注册等认证页随机背景图（JSON 数组字符串，每项为图片 URL）
 	SettingAuthBgImages       = "auth_bg_images"
 	SettingAllowRegister      = "allow_register"
@@ -77,6 +79,7 @@ func DefaultSettings() map[string]string {
 		SettingSiteURL:            "",
 		SettingGlobalFont:         "\"Mojangles\", \"IBM Plex Sans\", sans-serif",
 		SettingGlobalFontURL:      "https://raw.githubusercontent.com/EJD799/mathcraft3d/master/mojangles.ttf",
+		SettingGlobalFontSize:     "16",
 		SettingAuthBgImages:       "",
 		SettingAllowRegister:      "true",
 		SettingAllowUpload:        "true",

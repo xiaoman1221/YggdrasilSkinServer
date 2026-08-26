@@ -276,23 +276,23 @@ export default function TextureLibrary() {
                       <>
                         <StatusTag kind={item.status === 'approved' ? 'on' : 'warn'}>{item.status}</StatusTag>
                         <TextLink onClick={() => copyItem(item)}>
-                          <Copy size={13} strokeWidth={1.5} />
+                          <Copy size="1em" strokeWidth={1.5} />
                           <span className="lnk-txt">复制</span>
                         </TextLink>
                         {item.texture?.type === 'skin' ? (
                           <TextLink onClick={() => setPickerFor(item)}>
-                            <ImagePlus size={13} strokeWidth={1.5} />
+                            <ImagePlus size="1em" strokeWidth={1.5} />
                             <span className="lnk-txt">设为皮肤</span>
                           </TextLink>
                         ) : null}
                         {item.texture?.type === 'skin' ? (
                           <TextLink onClick={() => setAsAvatar(item)}>
-                            <UserRound size={13} strokeWidth={1.5} />
+                            <UserRound size="1em" strokeWidth={1.5} />
                             <span className="lnk-txt">设为头像</span>
                           </TextLink>
                         ) : null}
                         <TextLink danger onClick={() => setReportFor(item)}>
-                          <Flag size={13} strokeWidth={1.5} />
+                          <Flag size="1em" strokeWidth={1.5} />
                           <span className="lnk-txt">举报</span>
                         </TextLink>
                       </>
@@ -342,18 +342,18 @@ export default function TextureLibrary() {
                         {item.is_free ? (
                           <>
                             <TextLink onClick={() => copyYsm(item)}>
-                              <Copy size={13} strokeWidth={1.5} />
+                              <Copy size="1em" strokeWidth={1.5} />
                               <span className="lnk-txt">复制</span>
                             </TextLink>
                             <TextLink onClick={() => setYsmPickerFor(item)}>
-                              <ImagePlus size={13} strokeWidth={1.5} />
+                              <ImagePlus size="1em" strokeWidth={1.5} />
                               <span className="lnk-txt">设为模型</span>
                             </TextLink>
                           </>
                         ) : null}
                         {!item.is_free && item.purchase_url ? (
                           <a className="link-btn" href={item.purchase_url} target="_blank" rel="noreferrer">
-                            <Download size={13} strokeWidth={1.5} />
+                            <Download size="1em" strokeWidth={1.5} />
                             <span className="lnk-txt">购买获取</span>
                           </a>
                         ) : null}

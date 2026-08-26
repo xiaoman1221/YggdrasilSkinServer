@@ -43,6 +43,7 @@ func (h *SiteHandler) Info(c *gin.Context) {
 		"site_announcement": h.settingsSvc.Get(model.SettingSiteAnnouncement, ""),
 		"font_family":       h.settingsSvc.Get(model.SettingGlobalFont, defs[model.SettingGlobalFont]),
 		"font_url":          h.settingsSvc.Get(model.SettingGlobalFontURL, defs[model.SettingGlobalFontURL]),
+		"font_size":         h.settingsSvc.GetInt(model.SettingGlobalFontSize, 16),
 		"allow_register":    h.settingsSvc.GetBool(model.SettingAllowRegister, true),
 		"allow_upload":      h.settingsSvc.GetBool(model.SettingAllowUpload, true),
 		"mojang_enabled":    h.mojangSvc != nil && h.mojangSvc.Enabled(),

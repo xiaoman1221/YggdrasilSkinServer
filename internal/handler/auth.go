@@ -1,15 +1,20 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"YggdrasilSkinServer/internal/database"
 	"YggdrasilSkinServer/internal/envelope"
 	"YggdrasilSkinServer/internal/middleware"
+	"YggdrasilSkinServer/internal/model"
 	"YggdrasilSkinServer/internal/service"
+	"YggdrasilSkinServer/internal/util"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,22 +26,28 @@ type AuthHandler struct {
 	mailSvc     *service.MailService
 	oauthSvc    *service.OauthGoService
 	settingsSvc *service.SettingService
+	captchaSvc  *service.CaptchaService
+	passkeySvc  *service.PasskeyService
 }
 
 // NewAuthHandler 创建 AuthHandler。
-func NewAuthHandler(authSvc *service.AuthService, textureSvc *service.TextureService, mailSvc *service.MailService, oauthSvc *service.OauthGoService, settingsSvc *service.SettingService) *AuthHandler {
-	return &AuthHandler{authSvc: authSvc, textureSvc: textureSvc, mailSvc: mailSvc, oauthSvc: oauthSvc, settingsSvc: settingsSvc}
+func NewAuthHandler(authSvc *service.AuthService, textureSvc *service.TextureService, mailSvc *service.MailService, oauthSvc *service.OauthGoService, settingsSvc *service.SettingService, captchaSvc *service.CaptchaService, passkeySvc *service.PasskeyService) *AuthHandler {
+	return &AuthHandler{authSvc: authSvc, textureSvc: textureSvc, mailSvc: mailSvc, oauthSvc: oauthSvc, settingsSvc: settingsSvc, captchaSvc: captchaSvc, passkeySvc: passkeySvc}
 }
 
 type credentialsRequest struct {
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Email       string `json:"email"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	CaptchaID   string `json:"captchaId"`
+	CaptchaCode string `json:"captchaCode"`
 }
 
 type loginRequest struct {
-	Account  string `json:"account"` // 邮箱或用户名
-	Password string `json:"password"`
+	Account     string `json:"account"` // 邮箱或用户名
+	Password    string `json:"password"`
+	CaptchaID   string `json:"captchaId"`
+	CaptchaCode string `json:"captchaCode"`
 }
 
 type refreshRequest struct {
@@ -70,6 +81,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
 		return
 	}
+	// 策略为 always 时注册需要图形验证码
+	if h.captchaSvc.Policy() == service.CaptchaAlways && !h.captchaSvc.Verify(req.CaptchaID, req.CaptchaCode) {
+		writeEnvelopeErrorDetails(c, envelope.CodeValidation, "图形验证码错误或已过期，请重试", gin.H{"captcha": true})
+		return
+	}
 
 	user, err := h.authSvc.Register(req.Email, req.Username, req.Password)
 	if err != nil {
@@ -90,16 +106,29 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
 		return
 	}
+	failKey := "login:" + c.ClientIP() + ":" + strings.ToLower(strings.TrimSpace(req.Account))
+
+	// 验证码策略：始终需要，或连续失败达到阈值后需要
+	if h.captchaSvc.RequiredFor(failKey, "login") && !h.captchaSvc.Verify(req.CaptchaID, req.CaptchaCode) {
+		writeEnvelopeErrorDetails(c, envelope.CodeValidation, "图形验证码错误或已过期，请重试", gin.H{"captcha": true})
+		return
+	}
 
 	user, session, err := h.authSvc.Login(req.Account, req.Password, c.ClientIP(), c.GetHeader("User-Agent"))
 	if err != nil {
+		h.captchaSvc.RecordFailure(failKey)
 		code := envelope.CodeUnauthorized
 		if !errors.Is(err, service.ErrInvalidCredentials) {
 			code = envelope.CodeInternalError
 		}
-		writeEnvelopeError(c, code, err.Error())
+		var details any
+		if h.captchaSvc.RequiredFor(failKey, "login") {
+			details = gin.H{"captcha": true}
+		}
+		writeEnvelopeErrorDetails(c, code, err.Error(), details)
 		return
 	}
+	h.captchaSvc.ResetFailure(failKey)
 
 	accessToken, err := h.authSvc.IssueAccessToken(user)
 	if err != nil {
@@ -168,9 +197,87 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, envelope.OK(gin.H{"user": user}))
 }
 
+// sessionView 是会话列表的视图（隐藏 refreshToken）。
+type sessionView struct {
+	model.Session
+	Current bool `json:"current"`
+}
+
+// ListSessions GET /api/v1/auth/sessions —— 当前用户的全部有效登录会话。
+// 客户端可通过 X-Refresh-Token 请求头标记当前设备。
+func (h *AuthHandler) ListSessions(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	sessions, err := h.authSvc.ListSessions(user.ID)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	current := c.GetHeader("X-Refresh-Token")
+	views := make([]sessionView, 0, len(sessions))
+	for _, s := range sessions {
+		views = append(views, sessionView{Session: s, Current: current != "" && s.RefreshToken == current})
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"sessions": views}))
+}
+
+// RevokeSession DELETE /api/v1/auth/sessions/:id —— 下线指定会话（仅限本人）。
+func (h *AuthHandler) RevokeSession(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid session id")
+		return
+	}
+	if err := h.authSvc.RevokeSession(uint(id), user.ID); err != nil {
+		if errors.Is(err, service.ErrSessionNotFound) {
+			writeEnvelopeError(c, envelope.CodeNotFound, "session not found")
+			return
+		}
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(nil))
+}
+
+// RevokeOtherSessions DELETE /api/v1/auth/sessions —— 下线当前用户的其他全部会话。
+func (h *AuthHandler) RevokeOtherSessions(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	var req struct {
+		RefreshToken string `json:"refreshToken"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
+		return
+	}
+	if err := h.authSvc.RevokeOtherSessions(user.ID, req.RefreshToken); err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(nil))
+}
+
 // writeEnvelopeError 以统一 envelope 输出错误响应。
 func writeEnvelopeError(c *gin.Context, code int, message string) {
 	c.JSON(envelope.HTTPStatus(code), envelope.Err(code, message))
+}
+
+// writeEnvelopeErrorDetails 以统一 envelope 输出带详情字段的错误响应。
+func writeEnvelopeErrorDetails(c *gin.Context, code int, message string, details any) {
+	c.JSON(envelope.HTTPStatus(code), envelope.Response{
+		Error: &envelope.APIError{Code: code, Message: message, Details: details},
+	})
 }
 
 // SetAvatar PUT /api/v1/auth/avatar —— 用 wardrobe 材质快捷设为头像
@@ -200,6 +307,46 @@ func (h *AuthHandler) SetAvatar(c *gin.Context) {
 	avatarURL, err := h.textureSvc.AvatarHead(texture)
 	if err != nil {
 		writeEnvelopeError(c, envelope.CodeBadRequest, err.Error())
+		return
+	}
+	user.AvatarURL = avatarURL
+	if err := database.DB.Save(user).Error; err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"user": user}))
+}
+
+// UploadAvatar POST /api/v1/auth/avatar/upload —— 直接上传头像图片（PNG，最大 1MB）
+func (h *AuthHandler) UploadAvatar(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	file, err := c.FormFile("file")
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "missing file")
+		return
+	}
+	f, err := file.Open()
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, 2<<20))
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	avatarURL, err := h.authSvc.UploadAvatar(user.ID, data)
+	if err != nil {
+		code := envelope.CodeBadRequest
+		if !errors.Is(err, util.ErrInvalidImage) && !errors.Is(err, util.ErrImageTooLarge) {
+			code = envelope.CodeInternalError
+		}
+		writeEnvelopeError(c, code, err.Error())
 		return
 	}
 	user.AvatarURL = avatarURL
@@ -327,6 +474,160 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	c.JSON(http.StatusOK, envelope.OK(nil))
 }
 
+// PasskeyBeginRegistration POST /api/v1/auth/passkey/register/begin —— 开始注册通行密钥
+func (h *AuthHandler) PasskeyBeginRegistration(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	if h.passkeySvc == nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "WebAuthn 未配置，请先设置站点地址")
+		return
+	}
+	options, sessionID, err := h.passkeySvc.BeginRegistration(user)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"sessionId": sessionID, "options": options}))
+}
+
+// PasskeyFinishRegistration POST /api/v1/auth/passkey/register/finish —— 校验并保存注册响应
+func (h *AuthHandler) PasskeyFinishRegistration(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	if h.passkeySvc == nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "WebAuthn 未配置，请先设置站点地址")
+		return
+	}
+	var req struct {
+		SessionID string          `json:"sessionId"`
+		Response  json.RawMessage `json:"response"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.SessionID == "" || len(req.Response) == 0 {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
+		return
+	}
+	credential, err := h.passkeySvc.FinishRegistration(user, req.SessionID, req.Response)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"credentialId": string(credential.ID)}))
+}
+
+// PasskeyBeginLogin POST /api/v1/auth/passkey/login/begin —— 开始通行密钥登录
+func (h *AuthHandler) PasskeyBeginLogin(c *gin.Context) {
+	var req struct {
+		Account string `json:"account"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
+		return
+	}
+	if h.passkeySvc == nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "WebAuthn 未配置，请先设置站点地址")
+		return
+	}
+	options, sessionID, err := h.passkeySvc.BeginLogin(req.Account)
+	if err != nil {
+		code := envelope.CodeBadRequest
+		if errors.Is(err, service.ErrInvalidCredentials) {
+			code = envelope.CodeNotFound
+		}
+		writeEnvelopeError(c, code, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"sessionId": sessionID, "options": options}))
+}
+
+// PasskeyFinishLogin POST /api/v1/auth/passkey/login/finish —— 校验断言并签发会话
+func (h *AuthHandler) PasskeyFinishLogin(c *gin.Context) {
+	if h.passkeySvc == nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "WebAuthn 未配置，请先设置站点地址")
+		return
+	}
+	var req struct {
+		SessionID string          `json:"sessionId"`
+		Response  json.RawMessage `json:"response"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.SessionID == "" || len(req.Response) == 0 {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
+		return
+	}
+	user, err := h.passkeySvc.FinishLogin(req.SessionID, req.Response)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, err.Error())
+		return
+	}
+	session, err := h.authSvc.CreateSessionForUser(user.ID, c.ClientIP(), c.GetHeader("User-Agent"))
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	accessToken, err := h.authSvc.IssueAccessToken(user)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, "failed to issue token")
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{
+		"accessToken":  accessToken,
+		"refreshToken": session.RefreshToken,
+		"expiresIn":    int(h.authSvc.Cfg().ExpireDuration().Seconds()),
+		"user":         user,
+	}))
+}
+
+// PasskeyCredentials GET /api/v1/auth/passkey/credentials —— 当前用户的通行密钥列表
+func (h *AuthHandler) PasskeyCredentials(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	if h.passkeySvc == nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "WebAuthn 未配置，请先设置站点地址")
+		return
+	}
+	credentials, err := h.passkeySvc.ListCredentials(user.ID)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(gin.H{"credentials": credentials}))
+}
+
+// PasskeyRemove DELETE /api/v1/auth/passkey/credentials/:id —— 删除指定通行密钥
+func (h *AuthHandler) PasskeyRemove(c *gin.Context) {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		writeEnvelopeError(c, envelope.CodeUnauthorized, "unauthorized")
+		return
+	}
+	if h.passkeySvc == nil {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "WebAuthn 未配置，请先设置站点地址")
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid credential id")
+		return
+	}
+	if err := h.passkeySvc.RemoveCredential(user.ID, uint(id)); err != nil {
+		if errors.Is(err, service.ErrPasskeyNotFound) {
+			writeEnvelopeError(c, envelope.CodeNotFound, "passkey credential not found")
+			return
+		}
+		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, envelope.OK(nil))
+}
+
 // OAuthProviders GET /api/v1/auth/oauth/providers —— 可用第三方登录渠道
 func (h *AuthHandler) OAuthProviders(c *gin.Context) {
 	if !h.oauthSvc.Enabled() {
@@ -380,7 +681,7 @@ func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 		fail(err.Error())
 		return
 	}
-	user, err := h.authSvc.FindOrCreateOAuthUser(info.Type, info.OpenID, info.Nickname, info.Email)
+	user, err := h.authSvc.FindOrCreateOAuthUser(info.Type, info.OpenID, info.Nickname, info.Email, info.Avatar)
 	if err != nil {
 		fail(err.Error())
 		return
@@ -398,6 +699,3 @@ func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 	// 令牌放 URL fragment（#），不会发往服务器，也不进浏览器历史
 	c.Redirect(http.StatusFound, siteURL+"/oauth/callback#access="+accessToken+"&refresh="+session.RefreshToken)
 }
-
-
-

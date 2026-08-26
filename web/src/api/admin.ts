@@ -31,6 +31,7 @@ export interface SiteSettings {
   oauthgo_api_base: string
   oauthgo_app_id: string
   oauthgo_app_key: string
+  captcha_policy: string
 }
 
 export interface AdminUser {

@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -28,6 +30,7 @@ var (
 	ErrWrongPassword      = errors.New("current password is incorrect")
 	ErrEmailNotFound      = errors.New("no user found with this email")
 	ErrInvalidResetToken  = errors.New("invalid or expired reset token")
+	ErrSessionNotFound    = errors.New("session not found")
 )
 
 // sessionTTL 是站点 refresh 会话的有效期。
@@ -42,6 +45,26 @@ type AuthService struct {
 
 // Cfg 返回配置引用（供 handler 读取过期时长等）。
 func (s *AuthService) Cfg() *config.Config { return s.cfg }
+
+// UploadAvatar 上传并保存用户头像（安全重编码为 PNG，最大 512x512、1MB），返回公开 URL。
+func (s *AuthService) UploadAvatar(userID uint, data []byte) (string, error) {
+	if int64(len(data)) > 1<<20 {
+		return "", errors.New("avatar file too large (max 1 MB)")
+	}
+	processed, _, _, err := util.ProcessPNG(data, 512, 512)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(s.cfg.Storage.TextureDir, 0o755); err != nil {
+		return "", err
+	}
+	filename := fmt.Sprintf("avatar_%d_%s.png", userID, util.HashPNG(processed)[:16])
+	dst := filepath.Join(s.cfg.Storage.TextureDir, filename)
+	if err := os.WriteFile(dst, processed, 0o644); err != nil {
+		return "", err
+	}
+	return s.settings.TextureURL(filename[:len(filename)-4], s.cfg.Storage.BaseURL), nil
+}
 
 // NewAuthService 创建 AuthService。
 func NewAuthService(db *gorm.DB, cfg *config.Config, settings *SettingService) *AuthService {
@@ -176,6 +199,37 @@ func (s *AuthService) Logout(refreshToken string) error {
 		return nil
 	}
 	return s.db.Delete(&model.Session{}, "refresh_token = ?", refreshToken).Error
+}
+
+// ListSessions 返回用户全部有效会话（按创建时间倒序）。
+func (s *AuthService) ListSessions(userID uint) ([]model.Session, error) {
+	var sessions []model.Session
+	if err := s.db.Where("user_id = ? AND expires_at > ?", userID, time.Now()).
+		Order("created_at DESC").Find(&sessions).Error; err != nil {
+		return nil, err
+	}
+	return sessions, nil
+}
+
+// RevokeSession 使指定会话失效（仅限本人）。
+func (s *AuthService) RevokeSession(sessionID, userID uint) error {
+	res := s.db.Delete(&model.Session{}, "id = ? AND user_id = ?", sessionID, userID)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrSessionNotFound
+	}
+	return nil
+}
+
+// RevokeOtherSessions 下线除 keepRefreshToken 外的全部会话。
+func (s *AuthService) RevokeOtherSessions(userID uint, keepRefreshToken string) error {
+	if strings.TrimSpace(keepRefreshToken) == "" {
+		// 未指定保留会话时视为下线全部（当前会话由前端随后清除）
+		return s.db.Delete(&model.Session{}, "user_id = ?", userID).Error
+	}
+	return s.db.Delete(&model.Session{}, "user_id = ? AND refresh_token <> ?", userID, keepRefreshToken).Error
 }
 
 // IssueAccessToken 为用户签发站点 JWT（访问令牌）。
@@ -388,10 +442,17 @@ func (s *AuthService) AdminUpdateUser(userID uint, username, email, newPassword 
 }
 
 // FindOrCreateOAuthUser 按 (type, openid) 查找绑定的用户；未绑定时创建新账号。
-func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email string) (*model.User, error) {
+// avatar 为第三方平台头像地址（可为空），新账号或尚未设置头像的账号会使用它。
+func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, avatar string) (*model.User, error) {
 	var user model.User
 	err := s.db.Where("oauth_type = ? AND oauth_openid = ?", oauthType, openid).First(&user).Error
 	if err == nil {
+		if user.AvatarURL == "" && avatar != "" {
+			user.AvatarURL = avatar
+			if err := s.db.Save(&user).Error; err != nil {
+				return nil, err
+			}
+		}
 		return &user, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -402,6 +463,9 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email s
 		if err := s.db.Where("email = ?", strings.ToLower(email)).First(&user).Error; err == nil {
 			user.OAuthType = oauthType
 			user.OAuthOpenID = openid
+			if user.AvatarURL == "" {
+				user.AvatarURL = avatar
+			}
 			if err := s.db.Save(&user).Error; err != nil {
 				return nil, err
 			}
@@ -436,6 +500,7 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email s
 		Permissions:  "user",
 		OAuthType:    oauthType,
 		OAuthOpenID:  openid,
+		AvatarURL:    avatar,
 	}
 	if err := s.db.Create(newUser).Error; err != nil {
 		return nil, err
@@ -449,5 +514,3 @@ func min(a, b int) int {
 	}
 	return b
 }
-
-

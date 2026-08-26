@@ -24,6 +24,24 @@ export interface LoginRecord {
   created_at: string
 }
 
+export interface SessionInfo {
+  id: number
+  user_id: number
+  ip: string
+  user_agent: string
+  expires_at: string
+  created_at: string
+  current?: boolean
+}
+
+export interface PasskeyCredential {
+  id: number
+  user_id: number
+  credential_id: string
+  name: string
+  created_at: string
+}
+
 export interface Paged<T> {
   records: T[]
   total: number
@@ -35,14 +53,19 @@ export interface LoginResult {
   user: User
 }
 
+export interface CaptchaPayload {
+  captchaId?: string
+  captchaCode?: string
+}
+
 export const authApi = {
   setup: (payload: { username: string; email: string; password: string }) =>
     request<{ user: User }>({ method: 'POST', url: '/auth/setup', data: payload }),
 
-  register: (payload: { username: string; email: string; password: string }) =>
+  register: (payload: { username: string; email: string; password: string } & CaptchaPayload) =>
     request<{ user: User }>({ method: 'POST', url: '/auth/register', data: payload }),
 
-  login: (payload: { account: string; password: string }) =>
+  login: (payload: { account: string; password: string } & CaptchaPayload) =>
     request<LoginResult>({ method: 'POST', url: '/auth/login', data: payload }),
 
   refresh: (refreshToken: string) =>
@@ -56,10 +79,59 @@ export const authApi = {
   setAvatar: (textureId: number) =>
     request<{ user: User }>({ method: 'PUT', url: '/auth/avatar', data: { textureId } }),
 
+  uploadAvatar: (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request<{ user: User }>({ method: 'POST', url: '/auth/avatar/upload', data: fd })
+  },
+
   clearAvatar: () => request<{ user: User }>({ method: 'DELETE', url: '/auth/avatar' }),
 
   loginRecords: (params?: { limit?: number; offset?: number }) =>
     request<Paged<LoginRecord>>({ method: 'GET', url: '/auth/login-records', params }),
+
+  listSessions: (currentRefreshToken?: string) =>
+    request<{ sessions: SessionInfo[] }>({
+      method: 'GET',
+      url: '/auth/sessions',
+      headers: currentRefreshToken ? { 'X-Refresh-Token': currentRefreshToken } : undefined,
+    }),
+
+  revokeSession: (sessionId: number) =>
+    request<void>({ method: 'DELETE', url: `/auth/sessions/${sessionId}` }),
+
+  revokeOtherSessions: (refreshToken: string) =>
+    request<void>({ method: 'DELETE', url: '/auth/sessions', data: { refreshToken } }),
+
+  passkeyRegisterBegin: () =>
+    request<{ sessionId: string; options: any }>({ method: 'POST', url: '/auth/passkey/register/begin' }),
+
+  passkeyRegisterFinish: (sessionId: string, response: any) =>
+    request<{ credentialId: string }>({
+      method: 'POST',
+      url: '/auth/passkey/register/finish',
+      data: { sessionId, response },
+    }),
+
+  passkeyLoginBegin: (account: string) =>
+    request<{ sessionId: string; options: any }>({
+      method: 'POST',
+      url: '/auth/passkey/login/begin',
+      data: { account },
+    }),
+
+  passkeyLoginFinish: (sessionId: string, response: any) =>
+    request<LoginResult>({
+      method: 'POST',
+      url: '/auth/passkey/login/finish',
+      data: { sessionId, response },
+    }),
+
+  passkeyCredentials: () =>
+    request<{ credentials: PasskeyCredential[] }>({ method: 'GET', url: '/auth/passkey/credentials' }),
+
+  passkeyRemove: (id: number) =>
+    request<void>({ method: 'DELETE', url: `/auth/passkey/credentials/${id}` }),
 
   mojangAuthorize: () =>
     request<{ url: string }>({ method: 'GET', url: '/auth/mojang/authorize' }),

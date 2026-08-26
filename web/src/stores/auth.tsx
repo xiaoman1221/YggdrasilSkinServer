@@ -7,8 +7,8 @@ const REFRESH_KEY = 'yss_refresh_token'
 interface AuthState {
   user: User | null
   loading: boolean
-  login: (account: string, password: string) => Promise<void>
-  register: (username: string, email: string, password: string) => Promise<void>
+  login: (account: string, password: string, captcha?: { captchaId?: string; captchaCode?: string }) => Promise<void>
+  register: (username: string, email: string, password: string, captcha?: { captchaId?: string; captchaCode?: string }) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -34,15 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  async function login(account: string, password: string) {
-    const res = await authApi.login({ account, password })
+  async function login(account: string, password: string, captcha?: { captchaId?: string; captchaCode?: string }) {
+    const res = await authApi.login({ account, password, ...captcha })
     localStorage.setItem(ACCESS_KEY, res.accessToken)
     localStorage.setItem(REFRESH_KEY, res.refreshToken)
     setUser(res.user)
   }
 
-  async function register(username: string, email: string, password: string) {
-    await authApi.register({ username, email, password })
+  async function register(username: string, email: string, password: string, captcha?: { captchaId?: string; captchaCode?: string }) {
+    await authApi.register({ username, email, password, ...captcha })
   }
 
   async function logout() {

@@ -43,6 +43,9 @@ const (
 	SettingOauthAPIBase = "oauthgo_api_base" // 默认 https://o.1v.fit
 	SettingOauthAppID   = "oauthgo_app_id"
 	SettingOauthAppKey  = "oauthgo_app_key"
+
+	// 图形验证码策略：off 关闭 / always 登录注册始终需要 / after_failed 连续登录失败后需要
+	SettingCaptchaPolicy = "captcha_policy"
 )
 
 // PasswordReset 是忘记密码的重置令牌。
@@ -85,5 +88,6 @@ func DefaultSettings() map[string]string {
 		SettingOauthAPIBase:       "https://o.1v.fit",
 		SettingOauthAppID:         "",
 		SettingOauthAppKey:        "",
+		SettingCaptchaPolicy:      "off",
 	}
 }

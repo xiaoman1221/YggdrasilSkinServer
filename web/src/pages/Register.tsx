@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
+import { captchaApi } from '../api/captcha'
 import { Button, Field, Input } from '../components/ui'
+import CaptchaField, { CaptchaValue } from '../components/CaptchaField'
 import { useToast } from '../components/Toast'
 
 export default function Register() {
@@ -13,6 +15,30 @@ export default function Register() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
+  const [captchaRequired, setCaptchaRequired] = useState(false)
+  const [captcha, setCaptcha] = useState<CaptchaValue>({ id: '', image: '', code: '' })
+
+  useEffect(() => {
+    captchaApi
+      .policy()
+      .then((res) => {
+        if (res.policy === 'always') {
+          setCaptchaRequired(true)
+          refreshCaptcha()
+        }
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function refreshCaptcha() {
+    try {
+      const res = await captchaApi.get()
+      setCaptcha((prev) => ({ ...prev, id: res.id, image: res.image, code: '' }))
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -28,12 +54,22 @@ export default function Register() {
       toast.show('密码至少 6 位', 'err')
       return
     }
+    if (captchaRequired && (!captcha.id || !captcha.code.trim())) {
+      toast.show('请输入图形验证码', 'err')
+      return
+    }
     setBusy(true)
     try {
-      await register(username, email, password)
+      await register(username, email, password, {
+        captchaId: captchaRequired ? captcha.id : undefined,
+        captchaCode: captchaRequired ? captcha.code.trim() : undefined,
+      })
       toast.show('注册成功，请登录', 'ok')
       navigate('/login', { replace: true })
     } catch (err: any) {
+      if (err?.response?.data?.error?.details?.captcha) {
+        refreshCaptcha()
+      }
       toast.show(err?.response?.data?.error?.message || err.message || '注册失败', 'err')
     } finally {
       setBusy(false)
@@ -97,6 +133,9 @@ export default function Register() {
                 autoComplete="new-password"
               />
             </Field>
+            {captchaRequired ? (
+              <CaptchaField value={captcha} onChange={setCaptcha} onRefresh={refreshCaptcha} />
+            ) : null}
             <Button type="submit" variant="primary" size="lg" disabled={busy}>
               注册
               <ArrowRight size={16} strokeWidth={1.5} />

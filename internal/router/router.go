@@ -12,6 +12,7 @@ import (
 	"YggdrasilSkinServer/internal/database"
 	"YggdrasilSkinServer/internal/handler"
 	"YggdrasilSkinServer/internal/middleware"
+	"YggdrasilSkinServer/internal/model"
 	"YggdrasilSkinServer/internal/service"
 
 	"github.com/gin-contrib/cors"
@@ -68,9 +69,16 @@ func Setup(cfg *config.Config) *gin.Engine {
 	yggSvc := service.NewYggdrasilService(database.DB, cfg, textureSvc, loginRecordSvc, settingsSvc)
 	mailSvc := service.NewMailService(settingsSvc, cfg)
 	oauthSvc := service.NewOauthGoService(settingsSvc, cfg)
+	captchaSvc := service.NewCaptchaService(settingsSvc)
+	passkeySvc, err := service.NewPasskeyService(database.DB, cfg, settingsSvc)
+	if err != nil {
+		log.Printf("[passkey] WebAuthn disabled: %v", err)
+		passkeySvc = nil
+	}
 
 	// 处理器
-	authHandler := handler.NewAuthHandler(authSvc, textureSvc, mailSvc, oauthSvc, settingsSvc)
+	authHandler := handler.NewAuthHandler(authSvc, textureSvc, mailSvc, oauthSvc, settingsSvc, captchaSvc, passkeySvc)
+	captchaHandler := handler.NewCaptchaHandler(captchaSvc)
 	profileHandler := handler.NewProfileHandler(profileSvc, textureSvc)
 	ysmHandler := handler.NewYsmHandler(ysmSvc, profileSvc, cfg)
 	wardrobeHandler := handler.NewWardrobeHandler(textureSvc, librarySvc)
@@ -82,7 +90,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	yggHandler := handler.NewYggdrasilHandler(yggSvc)
 
 	registerYggdrasilRoutes(r, yggHandler)
-	registerV1Routes(r, cfg, authHandler, profileHandler, wardrobeHandler, libraryHandler, adminHandler, siteHandler, loginRecordHandler, mojangHandler, ysmHandler)
+	registerV1Routes(r, cfg, authHandler, captchaHandler, profileHandler, wardrobeHandler, libraryHandler, adminHandler, siteHandler, loginRecordHandler, mojangHandler, ysmHandler)
 	// YSM 模型下载：免费模型公开，付费模型由 handler 校验作者/管理员权限
 	r.GET("/ysm/:file", ysmHandler.ServeFile)
 
@@ -134,6 +142,7 @@ func registerV1Routes(
 	r *gin.Engine,
 	cfg *config.Config,
 	authHandler *handler.AuthHandler,
+	captchaHandler *handler.CaptchaHandler,
 	profileHandler *handler.ProfileHandler,
 	wardrobeHandler *handler.WardrobeHandler,
 	libraryHandler *handler.TextureLibraryHandler,
@@ -148,6 +157,9 @@ func registerV1Routes(
 	// 公开站点信息
 	v1.GET("/site/info", siteHandler.Info)
 	v1.GET("/auth/mojang/callback", mojangHandler.Callback)
+	// 图形验证码
+	v1.GET("/captcha", captchaHandler.Get)
+	v1.GET("/captcha/policy", captchaHandler.Policy)
 
 	// 账号与站点 API
 	auth := v1.Group("/auth")
@@ -158,7 +170,11 @@ func registerV1Routes(
 		auth.POST("/refresh", authHandler.Refresh)
 		auth.POST("/logout", authHandler.Logout)
 		auth.GET("/me", middleware.AuthRequired(cfg), authHandler.Me)
+		auth.GET("/sessions", middleware.AuthRequired(cfg), authHandler.ListSessions)
+		auth.DELETE("/sessions", middleware.AuthRequired(cfg), authHandler.RevokeOtherSessions)
+		auth.DELETE("/sessions/:id", middleware.AuthRequired(cfg), authHandler.RevokeSession)
 		auth.PUT("/avatar", middleware.AuthRequired(cfg), authHandler.SetAvatar)
+		auth.POST("/avatar/upload", middleware.AuthRequired(cfg), authHandler.UploadAvatar)
 		auth.DELETE("/avatar", middleware.AuthRequired(cfg), authHandler.ClearAvatar)
 		auth.GET("/login-records", middleware.AuthRequired(cfg), loginRecordHandler.Mine)
 		auth.GET("/mojang/authorize", middleware.AuthRequired(cfg), mojangHandler.Authorize)
@@ -172,6 +188,16 @@ func registerV1Routes(
 		auth.GET("/oauth/providers", authHandler.OAuthProviders)
 		auth.GET("/oauth/authorize", authHandler.OAuthAuthorize)
 		auth.GET("/oauth/callback", authHandler.OAuthCallback)
+		// Passkey / WebAuthn 通行密钥登录
+		auth.POST("/passkey/login/begin", authHandler.PasskeyBeginLogin)
+		auth.POST("/passkey/login/finish", authHandler.PasskeyFinishLogin)
+		passkey := auth.Group("/passkey", middleware.AuthRequired(cfg))
+		{
+			passkey.POST("/register/begin", authHandler.PasskeyBeginRegistration)
+			passkey.POST("/register/finish", authHandler.PasskeyFinishRegistration)
+			passkey.GET("/credentials", authHandler.PasskeyCredentials)
+			passkey.DELETE("/credentials/:id", authHandler.PasskeyRemove)
+		}
 	}
 
 	// Minecraft profile（当前用户）
@@ -218,11 +244,10 @@ func registerV1Routes(
 	}
 
 	// 管理员 API（admin 拥有全部权限）
-	admin := v1.Group("/admin", middleware.AuthRequired(cfg), middleware.RequirePermission("admin"))
+	admin := v1.Group("/admin", middleware.AuthRequired(cfg), middleware.RequirePermission(model.PermAdmin))
 	{
 		admin.GET("/minecraft-profiles", adminHandler.ListProfiles)
 		admin.GET("/minecraft-profiles/:uuid", adminHandler.GetProfile)
-		admin.GET("/users/:user_id/minecraft-profiles", adminHandler.ListUserProfiles)
 		admin.GET("/minecraft-profiles/:uuid/textures", adminHandler.ProfileTextures)
 		admin.DELETE("/minecraft-profiles/:uuid/textures/:type", adminHandler.UnbindTexture)
 		admin.DELETE("/minecraft-textures/:hash", adminHandler.DeleteTextureFile)
@@ -230,10 +255,6 @@ func registerV1Routes(
 		admin.DELETE("/minecraft-profiles/:uuid", adminHandler.DeleteProfile)
 		admin.GET("/audit-logs", adminHandler.AuditLogs)
 		admin.GET("/login-records", loginRecordHandler.AdminList)
-		admin.GET("/users", adminHandler.ListUsers)
-		admin.PUT("/users/:user_id", adminHandler.UpdateUser)
-		admin.PUT("/users/:user_id/permissions", adminHandler.SetUserPermissions)
-		admin.DELETE("/users/:user_id", adminHandler.DeleteUser)
 		admin.GET("/textures", adminHandler.ListTextures)
 		admin.DELETE("/textures/:texture_id", adminHandler.DeleteTextureByID)
 		admin.GET("/ysm", ysmHandler.AdminList)
@@ -242,9 +263,20 @@ func registerV1Routes(
 		admin.POST("/login-records/batch-delete", loginRecordHandler.AdminBatchDelete)
 	}
 
+	// 用户管理（admin 或拥有 user_manage scope 的 operator）
+	userAdmin := v1.Group("/admin/users",
+		middleware.AuthRequired(cfg), middleware.RequireAnyPermission(model.PermUserManage))
+	{
+		userAdmin.GET("", adminHandler.ListUsers)
+		userAdmin.GET("/:user_id/minecraft-profiles", adminHandler.ListUserProfiles)
+		userAdmin.PUT("/:user_id", adminHandler.UpdateUser)
+		userAdmin.PUT("/:user_id/permissions", adminHandler.SetUserPermissions)
+		userAdmin.DELETE("/:user_id", adminHandler.DeleteUser)
+	}
+
 	// 材质库管理（admin 或拥有 texture_library scope 的 operator）
 	libAdmin := v1.Group("/admin/texture-library",
-		middleware.AuthRequired(cfg), middleware.RequirePermission("texture_library"))
+		middleware.AuthRequired(cfg), middleware.RequireAnyPermission(model.PermTextureLibrary))
 	{
 		libAdmin.GET("/textures", adminHandler.LibraryTextures)
 		libAdmin.POST("/textures/:texture_id/:action", adminHandler.SetLibraryStatus)
@@ -265,6 +297,7 @@ func registerV1Routes(
 //   - /assets/* 静态资源
 //   - 首页 / 返回 index.html 并带 X-Authlib-Injector-API-Location 头
 //   - 未匹配的非 API 路径回退到 index.html（SPA），/api、/textures 保持 JSON 404
+//
 // 每次请求动态检查 dist 是否存在：启动后构建前端无需重启即可生效。
 func registerWebFrontend(r *gin.Engine, cfg *config.Config) {
 	dist := cfg.Server.WebDist
@@ -301,12 +334,3 @@ func registerWebFrontend(r *gin.Engine, cfg *config.Config) {
 		serveIndex(c)
 	})
 }
-
-
-
-
-
-
-
-
-

@@ -4,6 +4,7 @@ import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
 import { siteApi } from '../api/site'
 import { Spinner } from '../components/ui'
+import { assetUrl } from '../utils/format'
 
 export default function MainLayout() {
   const { user, loading, logout } = useAuth()
@@ -32,6 +33,9 @@ export default function MainLayout() {
   }
 
   const isSuper = user.id === 1
+  const perms = (user.permissions || '').split(',').map((p) => p.trim())
+  const isAdmin = isSuper || perms.includes('admin')
+  const canManage = isAdmin || perms.includes('texture_library') || perms.includes('user_manage')
 
   const navItems = [
     { to: '/', label: '控制台', icon: <LayoutDashboard size={17} strokeWidth={1.5} />, end: true },
@@ -50,10 +54,10 @@ export default function MainLayout() {
         <span className="site-name">{siteName}</span>
         <span className="spacer" />
         <div className="user">
-          {isSuper ? <span className="badge">超级管理员</span> : null}
+          {isSuper ? <span className="badge">超级管理员</span> : isAdmin ? <span className="badge">管理员</span> : null}
           {user.avatar_url ? (
             <img
-              src={new URL(user.avatar_url, window.location.origin).pathname}
+              src={assetUrl(user.avatar_url)}
               alt="头像"
               onClick={() => navigate('/settings')}
               title="个人设置"
@@ -90,17 +94,21 @@ export default function MainLayout() {
               {item.label}
             </NavLink>
           ))}
-          {isSuper && (
+          {canManage && (
             <>
               <span className="side-label">管理</span>
-              <NavLink to="/admin" className={({ isActive }) => (isActive ? 'active' : '')}>
-                <Shield size={17} strokeWidth={1.5} />
-                站点设置
-              </NavLink>
-              <NavLink to="/admin/records" className={({ isActive }) => (isActive ? 'active' : '')}>
-                <History size={17} strokeWidth={1.5} />
-                全部登录记录
-              </NavLink>
+              {(isAdmin || perms.includes('user_manage') || perms.includes('texture_library')) && (
+                <NavLink to="/admin" className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <Shield size={17} strokeWidth={1.5} />
+                  管理
+                </NavLink>
+              )}
+              {isAdmin && (
+                <NavLink to="/admin/records" className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <History size={17} strokeWidth={1.5} />
+                  全部登录记录
+                </NavLink>
+              )}
             </>
           )}
         </aside>

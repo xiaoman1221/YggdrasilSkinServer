@@ -384,6 +384,28 @@ func (h *AdminHandler) SetUserPermissions(c *gin.Context) {
 		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
 		return
 	}
+	perms := strings.Split(req.Permissions, ",")
+	known := map[string]bool{
+		"user":                   true,
+		model.PermAdmin:          true,
+		model.PermUserManage:     true,
+		model.PermTextureLibrary: true,
+	}
+	for _, p := range perms {
+		if !known[strings.TrimSpace(p)] {
+			writeEnvelopeError(c, envelope.CodeBadRequest, "unknown permission scope: "+strings.TrimSpace(p))
+			return
+		}
+	}
+	// 防止 user_manage operator 提权：仅完整管理员可授予 admin
+	if actor.ID != 1 && !actor.HasPermission(model.PermAdmin) {
+		for _, p := range perms {
+			if strings.TrimSpace(p) == model.PermAdmin {
+				writeEnvelopeError(c, envelope.CodeForbidden, "only full admin can grant admin permission")
+				return
+			}
+		}
+	}
 	var user model.User
 	if err := database.DB.First(&user, id).Error; err != nil {
 		writeEnvelopeError(c, envelope.CodeNotFound, "user not found")
@@ -414,6 +436,18 @@ func (h *AdminHandler) UpdateUser(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		writeEnvelopeError(c, envelope.CodeBadRequest, "invalid request body")
 		return
+	}
+	// operator（user_manage）不能修改管理员账号
+	if actor.ID != 1 && !actor.HasPermission(model.PermAdmin) {
+		var target model.User
+		if err := database.DB.First(&target, id).Error; err != nil {
+			writeEnvelopeError(c, envelope.CodeNotFound, "user not found")
+			return
+		}
+		if target.ID == 1 || target.HasPermission(model.PermAdmin) {
+			writeEnvelopeError(c, envelope.CodeForbidden, "operator cannot manage admin users")
+			return
+		}
 	}
 	user, err := h.authSvc.AdminUpdateUser(uint(id), req.Username, req.Email, req.NewPassword)
 	if err != nil {
@@ -453,6 +487,11 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	var user model.User
 	if err := database.DB.First(&user, id).Error; err != nil {
 		writeEnvelopeError(c, envelope.CodeNotFound, "user not found")
+		return
+	}
+	// operator（user_manage）不能删除管理员账号
+	if actor.ID != 1 && !actor.HasPermission(model.PermAdmin) && (user.ID == 1 || user.HasPermission(model.PermAdmin)) {
+		writeEnvelopeError(c, envelope.CodeForbidden, "operator cannot manage admin users")
 		return
 	}
 
@@ -594,5 +633,3 @@ func (h *AdminHandler) DeleteTextureByID(c *gin.Context) {
 	service.WriteAudit(database.DB, actor.ID, "admin.texture.delete", "texture", strconv.FormatUint(id, 10), "deleted texture "+hash)
 	c.JSON(http.StatusOK, envelope.OK(nil))
 }
-
-

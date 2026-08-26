@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, KeyRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../stores/auth'
 import { authApi } from '../api/auth'
+import { captchaApi } from '../api/captcha'
 import { Button, Field, Input } from '../components/ui'
+import CaptchaField, { CaptchaValue } from '../components/CaptchaField'
 import { useToast } from '../components/Toast'
+import { getPasskey } from '../lib/webauthn'
 
 const endpoints: [string, string][] = [
   ['POST', '/api/yggdrasil/authserver/authenticate'],
@@ -15,13 +18,16 @@ const endpoints: [string, string][] = [
 ]
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, refreshUser } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [oauth, setOauth] = useState<{ name: string; display_name?: string }[]>([])
+  const [captchaPolicy, setCaptchaPolicy] = useState('off')
+  const [captchaRequired, setCaptchaRequired] = useState(false)
+  const [captcha, setCaptcha] = useState<CaptchaValue>({ id: '', image: '', code: '' })
 
   useEffect(() => {
     authApi
@@ -30,7 +36,27 @@ export default function Login() {
         if (res.enabled) setOauth(res.providers || [])
       })
       .catch(() => {})
+    captchaApi
+      .policy()
+      .then((res) => {
+        setCaptchaPolicy(res.policy || 'off')
+        if (res.policy === 'always') {
+          setCaptchaRequired(true)
+          refreshCaptcha()
+        }
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function refreshCaptcha() {
+    try {
+      const res = await captchaApi.get()
+      setCaptcha((prev) => ({ ...prev, id: res.id, image: res.image, code: '' }))
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function oauthLogin(type: string) {
     try {
@@ -41,18 +67,51 @@ export default function Login() {
     }
   }
 
+  async function passkeyLogin() {
+    if (!account.trim()) {
+      toast.show('请先输入邮箱或用户名', 'err')
+      return
+    }
+    setBusy(true)
+    try {
+      const { sessionId, options } = await authApi.passkeyLoginBegin(account.trim())
+      const response = await getPasskey(options)
+      const res = await authApi.passkeyLoginFinish(sessionId, response)
+      localStorage.setItem('yss_access_token', res.accessToken)
+      localStorage.setItem('yss_refresh_token', res.refreshToken)
+      toast.show('登录成功', 'ok')
+      await refreshUser()
+      navigate('/', { replace: true })
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '通行密钥登录失败', 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!account || !password) {
       toast.show('请输入账号与密码', 'err')
       return
     }
+    if (captchaRequired && (!captcha.id || !captcha.code.trim())) {
+      toast.show('请输入图形验证码', 'err')
+      return
+    }
     setBusy(true)
     try {
-      await login(account, password)
+      await login(account, password, {
+        captchaId: captchaRequired ? captcha.id : undefined,
+        captchaCode: captchaRequired ? captcha.code.trim() : undefined,
+      })
       toast.show('登录成功', 'ok')
       navigate('/', { replace: true })
     } catch (err: any) {
+      if (err?.response?.data?.error?.details?.captcha) {
+        setCaptchaRequired(true)
+        refreshCaptcha()
+      }
       toast.show(err?.response?.data?.error?.message || err.message || '登录失败', 'err')
     } finally {
       setBusy(false)
@@ -107,9 +166,16 @@ export default function Login() {
                 autoComplete="current-password"
               />
             </Field>
+            {captchaRequired || captchaPolicy === 'always' ? (
+              <CaptchaField value={captcha} onChange={setCaptcha} onRefresh={refreshCaptcha} />
+            ) : null}
             <Button type="submit" variant="primary" size="lg" disabled={busy}>
               登录
               <ArrowRight size={16} strokeWidth={1.5} />
+            </Button>
+            <Button type="button" size="lg" disabled={busy} onClick={passkeyLogin}>
+              <KeyRound size={16} strokeWidth={1.5} />
+              使用通行密钥登录
             </Button>
             {oauth.length > 0 ? (
               <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>

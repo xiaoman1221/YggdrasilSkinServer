@@ -76,8 +76,8 @@ func AutoMigrate() error {
 		&model.LoginRecord{},
 		&model.AuditLog{},
 		&model.PasswordReset{},
+		&model.PasskeyCredential{},
 	)
 }
-
 
 

@@ -122,6 +122,26 @@ type OauthUserInfo struct {
 	Email    string `json:"email"`
 }
 
+// providerDisplayNames 是常见第三方渠道的中文显示名（用于登录页按钮）。
+var providerDisplayNames = map[string]string{
+	"gitee":     "Gitee",
+	"github":    "GitHub",
+	"qq":        "QQ",
+	"wechat":    "微信",
+	"weixin":    "微信",
+	"alipay":    "支付宝",
+	"dingtalk":  "钉钉",
+	"baidu":     "百度",
+	"weibo":     "微博",
+	"douyin":    "抖音",
+	"xiaomi":    "小米",
+	"feishu":    "飞书",
+	"microsoft": "Microsoft",
+	"google":    "Google",
+	"apple":     "Apple",
+	"steam":     "Steam",
+}
+
 // GetUserInfo 用一次性 code 换取用户信息。
 func (s *OauthGoService) GetUserInfo(oauthType, code string) (*OauthUserInfo, error) {
 	params := map[string]string{
@@ -164,6 +184,18 @@ func (s *OauthGoService) ListProviders() ([]map[string]any, error) {
 	var providers []map[string]any
 	if err := json.Unmarshal(data, &providers); err != nil {
 		return nil, fmt.Errorf("渠道列表解析失败: %w", err)
+	}
+	// 补充前端可展示的中文渠道名
+	for _, p := range providers {
+		if name, _ := p["name"].(string); name != "" {
+			if _, ok := p["display_name"]; !ok {
+				if dn, ok2 := providerDisplayNames[name]; ok2 {
+					p["display_name"] = dn
+				} else {
+					p["display_name"] = name
+				}
+			}
+		}
 	}
 	return providers, nil
 }

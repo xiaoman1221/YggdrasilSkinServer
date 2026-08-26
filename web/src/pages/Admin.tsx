@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Box, Download, Pencil, Save, Shield, Trash2 } from 'lucide-react'
+import { Box, Download, Flag, Pencil, Save, Shield, Trash2 } from 'lucide-react'
 import { adminApi, AdminProfile, AdminTexture, AdminUser, AdminYsmModel, SiteSettings, TextureReport } from '../api/admin'
 import { LibraryItem } from '../api/library'
 import { downloadYsmFile } from '../api/profile'
@@ -26,49 +26,60 @@ import type { Column } from '../components/ui'
 
 const PAGE_SIZE = 15
 
-type Tab = 'settings' | 'users' | 'profiles' | 'textures' | 'ysm'
+type Tab = 'settings' | 'users' | 'profiles' | 'textures' | 'ysm' | 'library'
 
 export default function Admin() {
   const { user } = useAuth()
-  const [tab, setTab] = useState<Tab>('settings')
+  const perms = (user?.permissions || '').split(',').map((p) => p.trim())
+  const isSuper = user?.id === 1
+  const isAdmin = isSuper || perms.includes('admin')
+  const canUsers = isAdmin || perms.includes('user_manage')
+  const canLibrary = isAdmin || perms.includes('texture_library')
 
-  if (user?.id !== 1) {
+  if (!isSuper && !isAdmin && !canUsers && !canLibrary) {
     return (
       <div>
         <h1 className="page-title">管理</h1>
         <div className="empty" style={{ marginTop: 16 }}>
-          仅超级管理员（UID = 1）可访问此页面
+          当前账号无管理权限
         </div>
       </div>
     )
   }
 
+  const tabs: { value: Tab; label: string }[] = [
+    ...(isSuper ? [{ value: 'settings' as Tab, label: '站点设置' }] : []),
+    ...(canUsers ? [{ value: 'users' as Tab, label: '用户管理' }] : []),
+    ...(isAdmin ? [{ value: 'profiles' as Tab, label: '档案管理' }] : []),
+    ...(isAdmin ? [{ value: 'textures' as Tab, label: '材质管理' }] : []),
+    ...(isAdmin ? [{ value: 'ysm' as Tab, label: '模型管理' }] : []),
+    ...(canLibrary ? [{ value: 'library' as Tab, label: '材质库审核' }] : []),
+  ]
+  const [tab, setTab] = useState<Tab>(tabs[0]?.value || 'settings')
+  const activeTab = tabs.some((t) => t.value === tab) ? tab : tabs[0]?.value
+  const roleText = isSuper
+    ? '超级管理员（UID = 1）'
+    : isAdmin
+      ? '管理员'
+      : `operator（${perms.filter((p) => p !== 'user').join(' / ') || 'user'}）`
+
   return (
     <div>
       <header className="page-head">
         <h1 className="page-title">管理</h1>
-        <p className="page-sub">超级管理员（UID = 1）</p>
+        <p className="page-sub">{roleText}</p>
       </header>
 
       <div style={{ marginBottom: 20 }}>
-        <Segmented<Tab>
-          options={[
-            { value: 'settings', label: '站点设置' },
-            { value: 'users', label: '用户管理' },
-            { value: 'profiles', label: '档案管理' },
-            { value: 'textures', label: '材质管理' },
-            { value: 'ysm', label: '模型管理' },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
+        <Segmented<Tab> options={tabs} value={activeTab} onChange={setTab} />
       </div>
 
-      {tab === 'settings' && <SettingsTab />}
-      {tab === 'users' && <UsersTab />}
-      {tab === 'profiles' && <ProfilesTab />}
-      {tab === 'textures' && <TexturesTab />}
-      {tab === 'ysm' && <YsmTab />}
+      {activeTab === 'settings' && <SettingsTab />}
+      {activeTab === 'users' && <UsersTab />}
+      {activeTab === 'profiles' && <ProfilesTab />}
+      {activeTab === 'textures' && <TexturesTab />}
+      {activeTab === 'ysm' && <YsmTab />}
+      {activeTab === 'library' && <LibraryTab />}
     </div>
   )
 }
@@ -104,6 +115,7 @@ const emptySettings: SiteSettings = {
   oauthgo_api_base: 'https://o.1v.fit',
   oauthgo_app_id: '',
   oauthgo_app_key: '',
+  captcha_policy: 'off',
 }
 
 function SettingsTab() {
@@ -180,6 +192,7 @@ function SettingsTab() {
         oauthgo_api_base: form.oauthgo_api_base.trim() || 'https://o.1v.fit',
         oauthgo_app_id: form.oauthgo_app_id.trim(),
         oauthgo_app_key: form.oauthgo_app_key,
+        captcha_policy: form.captcha_policy || 'off',
       })
       setForm({ ...emptySettings, ...res.settings })
       toast.show('设置已保存', 'ok')
@@ -278,6 +291,26 @@ function SettingsTab() {
           <Field label="站点 JWT 有效期（小时）">
             <Input className="mono" type="number" min={1} value={form.jwt_expire_hours} onChange={(e) => set('jwt_expire_hours', e.target.value)} />
           </Field>
+        </div>
+      </Panel>
+
+      <Panel title="登录安全">
+        <div className="panel-body" style={{ display: 'grid', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>图形验证码策略</div>
+            <Segmented
+              options={[
+                { value: 'off', label: '关闭' },
+                { value: 'always', label: '登录/注册始终需要' },
+                { value: 'after_failed', label: '连续登录失败后需要' },
+              ]}
+              value={form.captcha_policy}
+              onChange={(v) => set('captcha_policy', v)}
+            />
+            <p className="hint" style={{ margin: '10px 0 0' }}>
+              连续失败达到 3 次后，登录需输入图形验证码（10 分钟内有效）。
+            </p>
+          </div>
         </div>
       </Panel>
 
@@ -458,6 +491,22 @@ function UsersTab() {
 
   // 删除保护：不能删除自己与超级管理员
   const canDelete = (u: AdminUser) => u.id !== 1 && u.id !== me?.id
+  const meIsAdmin = me?.id === 1 || (me?.permissions || '').split(',').includes('admin')
+  const scopes = (u: AdminUser) =>
+    (u.permissions || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s && s !== 'user')
+  const scopeLabel: Record<string, string> = {
+    admin: '管理员',
+    texture_library: '材质库审核',
+    user_manage: '用户管理',
+  }
+  async function toggleScope(u: AdminUser, scope: string) {
+    const cur = scopes(u)
+    const next = cur.includes(scope) ? cur.filter((s) => s !== scope) : [...cur, scope]
+    await setPerm(u, next.length ? next.join(',') : 'user')
+  }
 
   const columns: Column<AdminUser>[] = [
     { key: 'id', title: 'ID', width: 60, align: 'right', render: (u) => <span className="data">{u.id}</span> },
@@ -466,12 +515,22 @@ function UsersTab() {
     {
       key: 'perms',
       title: '权限',
-      width: 110,
+      width: 180,
       render: (u) =>
         u.id === 1 ? (
           <StatusTag kind="on">超级管理员</StatusTag>
         ) : (
-          <StatusTag kind={u.permissions.includes('admin') ? 'on' : 'off'}>{u.permissions}</StatusTag>
+          <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6 }}>
+            {scopes(u).length === 0 ? (
+              <StatusTag kind="off">普通用户</StatusTag>
+            ) : (
+              scopes(u).map((s) => (
+                <StatusTag key={s} kind={s === 'admin' ? 'on' : 'warn'}>
+                  {scopeLabel[s] || s}
+                </StatusTag>
+              ))
+            )}
+          </span>
         ),
     },
     {
@@ -484,13 +543,23 @@ function UsersTab() {
     {
       key: 'actions',
       title: '操作',
-      width: 200,
+      width: 280,
       render: (u) =>
         u.id === 1 ? null : (
-          <span style={{ display: 'inline-flex', gap: 12 }}>
-            <TextLink onClick={() => setPerm(u, u.permissions.includes('admin') ? 'user' : 'admin')}>
+          <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 12 }}>
+            {meIsAdmin ? (
+              <TextLink onClick={() => setPerm(u, scopes(u).includes('admin') ? 'user' : 'admin')}>
+                <Shield size={13} strokeWidth={1.5} />
+                {scopes(u).includes('admin') ? '取消管理员' : '设为管理员'}
+              </TextLink>
+            ) : null}
+            <TextLink onClick={() => toggleScope(u, 'texture_library')}>
+              <Box size={13} strokeWidth={1.5} />
+              {scopes(u).includes('texture_library') ? '取消材质库' : '材质库审核'}
+            </TextLink>
+            <TextLink onClick={() => toggleScope(u, 'user_manage')}>
               <Shield size={13} strokeWidth={1.5} />
-              {u.permissions.includes('admin') ? '取消管理员' : '设为管理员'}
+              {scopes(u).includes('user_manage') ? '取消用户管理' : '用户管理'}
             </TextLink>
             <TextLink onClick={() => openEdit(u)}>
               <Pencil size={13} strokeWidth={1.5} />
@@ -1103,5 +1172,216 @@ function YsmTab() {
         </>
       )}
     </Panel>
+  )
+}
+
+/* ================= 材质库审核（texture_library operator） ================= */
+
+function LibraryTab() {
+  const toast = useToast()
+  const [items, setItems] = useState<LibraryItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [status, setStatus] = useState('pending')
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [busyId, setBusyId] = useState<number | null>(null)
+
+  const [reports, setReports] = useState<TextureReport[]>([])
+  const [reportTotal, setReportTotal] = useState(0)
+  const [reportPage, setReportPage] = useState(1)
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportBusyId, setReportBusyId] = useState<number | null>(null)
+
+  const load = useCallback(
+    async (p: number, st: string) => {
+      setLoading(true)
+      try {
+        const res = await adminApi.listLibraryTextures({ status: st, limit: PAGE_SIZE, offset: (p - 1) * PAGE_SIZE })
+        setItems(res.items || [])
+        setTotal(res.total || 0)
+      } catch (err: any) {
+        toast.show(err.message || '加载失败', 'err')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [toast],
+  )
+
+  const loadReports = useCallback(
+    async (p: number) => {
+      setReportsLoading(true)
+      try {
+        const res = await adminApi.listReports({ status: 'open', limit: PAGE_SIZE, offset: (p - 1) * PAGE_SIZE })
+        setReports(res.reports || [])
+        setReportTotal(res.total || 0)
+      } catch (err: any) {
+        toast.show(err.message || '加载失败', 'err')
+      } finally {
+        setReportsLoading(false)
+      }
+    },
+    [toast],
+  )
+
+  useEffect(() => {
+    load(page, status)
+  }, [load, page, status])
+
+  useEffect(() => {
+    loadReports(reportPage)
+  }, [loadReports, reportPage])
+
+  async function act(item: LibraryItem, action: 'approve' | 'reject' | 'unpublish') {
+    setBusyId(item.id)
+    try {
+      await adminApi.setLibraryStatus(item.id, action)
+      toast.show(action === 'approve' ? '已通过' : action === 'reject' ? '已拒绝' : '已下架', 'ok')
+      load(page, status)
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '操作失败', 'err')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleReport(r: TextureReport, action: 'accept' | 'reject') {
+    setReportBusyId(r.id)
+    try {
+      await adminApi.handleReport(r.id, action)
+      toast.show(action === 'accept' ? '已接受举报并处理' : '已驳回举报', 'ok')
+      loadReports(reportPage)
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '操作失败', 'err')
+    } finally {
+      setReportBusyId(null)
+    }
+  }
+
+  const statusLabel: Record<string, string> = { pending: '待审核', approved: '已通过', rejected: '已拒绝' }
+  const statusKind: Record<string, 'warn' | 'on' | 'danger'> = { pending: 'warn', approved: 'on', rejected: 'danger' }
+
+  const columns: Column<LibraryItem>[] = [
+    { key: 'id', title: 'ID', width: 60, align: 'right', render: (t) => <span className="data">{t.id}</span> },
+    { key: 'owner', title: '作者', width: 80, align: 'right', render: (t) => <span className="data">#{t.author}</span> },
+    {
+      key: 'preview',
+      title: '预览',
+      width: 64,
+      render: (t) =>
+        t.texture?.url ? (
+          <img className="thumb" src={new URL(t.texture.url, window.location.origin).pathname} alt="" />
+        ) : (
+          <span className="data">—</span>
+        ),
+    },
+    { key: 'title', title: '标题', render: (t) => <span className="mono">{t.title}</span> },
+    {
+      key: 'status',
+      title: '状态',
+      width: 90,
+      render: (t) => <StatusTag kind={statusKind[t.status] || 'off'}>{statusLabel[t.status] || t.status}</StatusTag>,
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      width: 200,
+      render: (t) => (
+        <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 12 }}>
+          {t.status === 'pending' ? (
+            <>
+              <TextLink onClick={() => act(t, 'approve')}>
+                {busyId === t.id ? '处理中…' : '通过'}
+              </TextLink>
+              <TextLink danger onClick={() => act(t, 'reject')}>
+                拒绝
+              </TextLink>
+            </>
+          ) : t.status === 'approved' ? (
+            <TextLink danger onClick={() => act(t, 'unpublish')}>
+              下架
+            </TextLink>
+          ) : null}
+        </span>
+      ),
+    },
+  ]
+
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <Panel
+        title="材质审核"
+        extra={
+          <Segmented
+            options={[
+              { value: 'pending', label: '待审核' },
+              { value: 'approved', label: '已通过' },
+              { value: 'rejected', label: '已拒绝' },
+            ]}
+            value={status}
+            onChange={(v) => {
+              setStatus(v)
+              setPage(1)
+            }}
+          />
+        }
+      >
+        {loading ? (
+          <Spinner label="加载材质" />
+        ) : items.length === 0 ? (
+          <Empty text="没有符合条件的材质" />
+        ) : (
+          <>
+            <Table columns={columns} data={items} />
+            <Pager page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
+          </>
+        )}
+      </Panel>
+
+      <Panel title="举报处理">
+        {reportsLoading ? (
+          <Spinner label="加载举报" />
+        ) : reports.length === 0 ? (
+          <Empty text="没有待处理举报" />
+        ) : (
+          <>
+            <div style={{ display: 'grid', gap: 10, padding: 14 }}>
+              {reports.map((r) => (
+                <div
+                  key={r.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 12px',
+                    border: '1px solid var(--line)',
+                    borderRadius: 10,
+                    background: 'var(--bg-muted)',
+                  }}
+                >
+                  <Flag size={16} strokeWidth={1.5} style={{ color: 'var(--text-3)' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: 'var(--text)' }}>
+                      材质 #{r.item_id} · 举报人 #{r.reporter_id}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{r.reason}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{new Date(r.created_at).toLocaleString()}</div>
+                  </div>
+                  <span style={{ display: 'inline-flex', gap: 12 }}>
+                    <TextLink onClick={() => handleReport(r, 'accept')}>
+                      {reportBusyId === r.id ? '处理中…' : '接受'}
+                    </TextLink>
+                    <TextLink danger onClick={() => handleReport(r, 'reject')}>
+                      驳回
+                    </TextLink>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <Pager page={reportPage} total={reportTotal} pageSize={PAGE_SIZE} onChange={setReportPage} />
+          </>
+        )}
+      </Panel>
+    </div>
   )
 }

@@ -7,6 +7,7 @@ import { useAuth } from '../stores/auth'
 import { useToast } from '../components/Toast'
 import { Button, Field, Input, Modal, Panel, Spinner, StatusTag, TextLink } from '../components/ui'
 import { PreviewCard } from '../components/PreviewCard'
+import { assetUrl } from '../utils/format'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -116,7 +117,7 @@ export default function Dashboard() {
             <div className="panel-body">
               {user?.avatar_url ? (
                 <img
-                  src={new URL(user.avatar_url, window.location.origin).pathname}
+                  src={assetUrl(user.avatar_url)}
                   alt="头像"
                   style={{ width: 64, height: 64, borderRadius: 8, border: "1px solid var(--line)", imageRendering: "pixelated", marginBottom: 12 }}
                 />
@@ -297,5 +298,4 @@ export default function Dashboard() {
     </div>
   )
 }
-
 

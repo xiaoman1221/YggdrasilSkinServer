@@ -66,17 +66,28 @@ func CurrentUser(c *gin.Context) (*model.User, error) {
 }
 
 // RequirePermission 校验当前用户是否拥有指定权限。
-// 超级管理员（UID=1）拥有全部权限；admin 权限也放行全部管理接口。
 func RequirePermission(perm string) gin.HandlerFunc {
+	return RequireAnyPermission(perm)
+}
+
+// RequireAnyPermission 校验当前用户是否拥有任一指定权限。
+// 超级管理员（UID=1）与 admin 权限拥有全部权限。
+func RequireAnyPermission(perms ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, err := CurrentUser(c)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		if user.ID == 1 || user.HasPermission(perm) || user.HasPermission("admin") {
+		if user.ID == 1 || user.HasPermission(model.PermAdmin) {
 			c.Next()
 			return
+		}
+		for _, p := range perms {
+			if user.HasPermission(p) {
+				c.Next()
+				return
+			}
 		}
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 	}
@@ -97,5 +108,3 @@ func RequireSuperAdmin() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-

@@ -6,6 +6,7 @@ import { authApi, OAuthProvider } from '../api/auth'
 import { captchaApi } from '../api/captcha'
 import { Button, Field, Input } from '../components/ui'
 import AuthAside from '../components/AuthAside'
+import AuthLangSwitch from '../components/AuthLangSwitch'
 import CaptchaField, { CaptchaValue } from '../components/CaptchaField'
 import { useToast } from '../components/Toast'
 import { useTranslation } from 'react-i18next'
@@ -101,6 +102,7 @@ export default function Register() {
       <AuthAside tagline={t('register.tagline')} />
 
       <main className="auth-main">
+        <AuthLangSwitch />
         <form className="auth-form" onSubmit={onSubmit}>
           <div>
             <h1>{t('register.title')}</h1>
@@ -111,7 +113,7 @@ export default function Register() {
               <Input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Steve"
+                placeholder={t('register.field.usernamePlaceholder')}
                 autoComplete="username"
                 autoFocus
               />
@@ -120,7 +122,7 @@ export default function Register() {
               <Input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={t('register.field.emailPlaceholder')}
                 autoComplete="email"
               />
             </Field>

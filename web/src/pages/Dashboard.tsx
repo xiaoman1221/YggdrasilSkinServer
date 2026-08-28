@@ -207,15 +207,10 @@ export default function Dashboard() {
                           {premiumSynced ? <StatusTag kind="on">{t('dashboard.profile.tagPremium')}</StatusTag> : null}
                           {p.skin_texture ? <StatusTag kind="on">{t('dashboard.profile.tagSkin')}</StatusTag> : null}
                           {p.cape_texture ? <StatusTag kind="on">{t('dashboard.profile.tagCape')}</StatusTag> : null}
-                          {p.ysm_model ? <StatusTag kind="warn">YSM</StatusTag> : null}
                         </span>
                       </>
                     }
-                    meta={
-                      p.ysm_model
-                        ? `${p.ysm_model.name} · ${p.uuid.slice(0, 8)}…`
-                        : `${p.uuid.slice(0, 8)}…`
-                    }
+                    meta={`${p.uuid.slice(0, 8)}…`}
                     actions={
                       <>
                         {mojangEnabled ? (
@@ -242,23 +237,37 @@ export default function Dashboard() {
                           <Pencil size={13} strokeWidth={1.5} />
                           {t('dashboard.profile.actionRename')}
                         </TextLink>
-                      {p.ysm_model ? (
-                        <>
-                          <TextLink
-                            onClick={async () => {
-                              try {
-                                await profileApi.unbindYsm(p.uuid)
-                                toast.show(t('dashboard.toast.ysmUnbound', { name: p.name }), 'ok')
-                                load()
-                              } catch (err: any) {
-                                toast.show(err?.response?.data?.error?.message || err.message || t('dashboard.toast.ysmUnbindFailed'), 'err')
-                              }
-                            }}
-                          >
-                            <Unlink size={13} strokeWidth={1.5} />
-                            {t('dashboard.profile.actionUnbind')}
-                          </TextLink>
-                        </>
+                      {p.skin_texture ? (
+                        <TextLink
+                          onClick={async () => {
+                            try {
+                              await profileApi.unbindTexture(p.uuid, 'skin')
+                              toast.show(t('dashboard.toast.unbindSkinOk', { name: p.name }), 'ok')
+                              load()
+                            } catch (err: any) {
+                              toast.show(err?.response?.data?.error?.message || err.message || t('dashboard.toast.unbindFailed'), 'err')
+                            }
+                          }}
+                        >
+                          <Unlink size={13} strokeWidth={1.5} />
+                          {t('dashboard.profile.actionUnbindSkin')}
+                        </TextLink>
+                      ) : null}
+                      {p.cape_texture ? (
+                        <TextLink
+                          onClick={async () => {
+                            try {
+                              await profileApi.unbindTexture(p.uuid, 'cape')
+                              toast.show(t('dashboard.toast.unbindCapeOk', { name: p.name }), 'ok')
+                              load()
+                            } catch (err: any) {
+                              toast.show(err?.response?.data?.error?.message || err.message || t('dashboard.toast.unbindFailed'), 'err')
+                            }
+                          }}
+                        >
+                          <Unlink size={13} strokeWidth={1.5} />
+                          {t('dashboard.profile.actionUnbindCape')}
+                        </TextLink>
                       ) : null}
                       <TextLink danger onClick={() => deleteProfile(p)}>
                         <Trash2 size={13} strokeWidth={1.5} />

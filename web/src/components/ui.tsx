@@ -18,9 +18,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md' | 'lg'
 }
 
-export function Button({ variant = 'outline', size = 'md', className = '', ...rest }: ButtonProps) {
+export function Button({ variant = 'outline', size = 'md', className = '', type = 'button', ...rest }: ButtonProps) {
   return (
     <button
+      type={type}
       className={`btn btn-${variant} ${size !== 'md' ? `btn-${size}` : ''} ${className}`.trim()}
       {...rest}
     />
@@ -148,15 +149,20 @@ export function Table<T>({
           </tr>
         </thead>
         <tbody>
-          {data.map((row, i) => (
-            <tr key={i}>
-              {columns.map((c) => (
-                <td key={c.key} className={c.align === 'right' ? 'num' : ''}>
-                  {c.render(row)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {data.map((row, i) => {
+            // 优先使用稳定的业务主键，避免用数组下标做 key 导致行状态错乱
+            const r = row as Record<string, unknown>
+            const rowKey = r?.id ?? r?.uuid ?? r?.name ?? i
+            return (
+              <tr key={String(rowKey)}>
+                {columns.map((c) => (
+                  <td key={c.key} className={c.align === 'right' ? 'num' : ''}>
+                    {c.render(row)}
+                  </td>
+                ))}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

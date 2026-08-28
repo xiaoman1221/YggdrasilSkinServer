@@ -125,6 +125,7 @@ export default {
     hint: 'E-Mail-Adresse oder Benutzername verwenden',
     field: {
       account: 'E-Mail-Adresse oder Benutzername',
+      accountPlaceholder: 'you@example.com / Steve',
       password: 'Passwort',
     },
     btn: {
@@ -152,7 +153,9 @@ export default {
     hint: 'Konto erstellen',
     field: {
       username: 'Benutzername',
+      usernamePlaceholder: 'Steve',
       email: 'E-Mail-Adresse',
+      emailPlaceholder: 'you@example.com',
       password: 'Passwort',
       passwordHint: 'Mindestens 6 Zeichen',
     },
@@ -178,7 +181,7 @@ export default {
     tagline: 'Passwort über die registrierte E-Mail-Adresse zurücksetzen.',
     title: 'Passwort vergessen',
     hint: 'Registrierte E-Mail-Adresse eingeben; ein Link zum Zurücksetzen wird zugeschickt.',
-    field: { email: 'Registrierte E-Mail-Adresse' },
+    field: { email: 'Registrierte E-Mail-Adresse', emailPlaceholder: 'you@example.com' },
     btn: { sending: 'Wird gesendet …', send: 'Link zum Zurücksetzen senden' },
     sent: {
       title: 'E-Mail gesendet',
@@ -269,6 +272,8 @@ export default {
       actionPremiumVerify: 'Premium-Verifizierung',
       actionRename: 'Umbenennen',
       actionUnbind: 'Verknüpfung lösen',
+      actionUnbindSkin: 'Skin lösen',
+      actionUnbindCape: 'Cape lösen',
       actionDelete: 'Löschen',
     },
     modal: {
@@ -299,6 +304,9 @@ export default {
       oauthUrlFailed: 'Autorisierungs-URL konnte nicht abgerufen werden',
       ysmUnbound: 'YSM-Modell von {{name}} wurde gelöst',
       ysmUnbindFailed: 'Lösen fehlgeschlagen',
+      unbindSkinOk: 'Skin von {{name}} gelöst',
+      unbindCapeOk: 'Cape von {{name}} gelöst',
+      unbindFailed: 'Lösen fehlgeschlagen',
     },
     confirm: {
       deleteProfile: 'Profil {{name}} wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
@@ -500,6 +508,7 @@ export default {
       setSkin: 'Als Skin festlegen',
       setAvatar: 'Als Avatar festlegen',
       setModel: 'Als Modell festlegen',
+      setCape: 'Als Cape festlegen',
       purchase: 'Käuflich erwerben',
       report: 'Melden',
     },
@@ -507,6 +516,7 @@ export default {
     picker: {
       skin: { title: 'Als Skin festlegen · Profil auswählen' },
       model: { title: 'Als Modell festlegen · Profil auswählen' },
+      cape: { title: 'Als Cape festlegen · Profil wählen' },
     },
     report: {
       title: 'Skin melden',
@@ -541,6 +551,8 @@ export default {
     sectionCapes: 'Umhänge',
     sectionYsm: 'YSM-Modelle',
     ysmDesc: 'Yes-Steve-Model-Modelle (.ysm / .zip). Nach dem Hochladen mit einem Profil verknüpfen und den Download-Link erhalten. In den Spielordner config/yes_steve_model/custom legen, um es zu verwenden.',
+    uploadYsmBtn: 'Modell hochladen',
+    status: { pending: 'Ausstehend', approved: 'In Bibliothek', rejected: 'Abgelehnt' },
     action: {
       setSkin: 'Als Skin festlegen',
       setAvatar: 'Als Avatar festlegen',
@@ -558,12 +570,15 @@ export default {
     picker: {
       skinTitle: 'Als Skin festlegen · Profil auswählen',
       modelTitle: 'Als Modell festlegen · Profil auswählen',
+      capeTitle: 'Als Cape festlegen · Profil wählen',
     },
     upload: {
       title: 'Textur hochladen',
       close: 'Schließen',
       type: 'Typ',
       model: 'Modell',
+      modelClassic: 'Klassisch',
+      modelSlim: 'Slim',
       nameLabel: 'Name (optional)',
       namePlaceholder: 'Gib der Textur einen Namen',
       descLabel: 'Beschreibung (optional)',
@@ -705,6 +720,9 @@ export default {
   admin: {
     title: 'Verwaltung',
     noPermission: 'Dieses Konto hat keine Verwaltungsberechtigung',
+    roleSuper: 'Super-Administrator (UID = 1)',
+    roleAdmin: 'Administrator',
+    roleOperator: 'Operator ({{perms}})',
     tabs: {
       settings: 'Servereinstellungen',
       users: 'Benutzerverwaltung',

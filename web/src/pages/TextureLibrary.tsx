@@ -4,15 +4,17 @@ import { libraryApi, LibraryItem, TextureTag, ysmLibraryApi, YsmLibraryItem } fr
 import { Profile, profileApi, textureUrl } from '../api/profile'
 import { authApi } from '../api/auth'
 import { useAuth } from '../stores/auth'
+import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
 import { Button, Field, Modal, Pager, Segmented, Spinner, StatusTag, TextLink, Textarea } from '../components/ui'
 import { PreviewCard } from '../components/PreviewCard'
 import { ProfilePicker } from '../components/ProfilePicker'
-import { formatSize } from '../utils/format'
+import { formatSize, safeExternalUrl } from '../utils/format'
 
 const PAGE_SIZE = 12
 
 export default function TextureLibrary() {
+  const { t } = useTranslation()
   const { refreshUser } = useAuth()
   const toast = useToast()
   const [tab, setTab] = useState<'skin' | 'cape' | 'ysm'>('skin')
@@ -51,7 +53,7 @@ export default function TextureLibrary() {
   const [ysmTotal, setYsmTotal] = useState(0)
   const [ysmLoading, setYsmLoading] = useState(true)
   const ysmSeqRef = useRef(0)
-  const [ysmPickerFor, setYsmPickerFor] = useState<YsmLibraryItem | null>(null)
+  const [capePickerFor, setCapePickerFor] = useState<LibraryItem | null>(null)
 
   const [keyword, setKeyword] = useState('')
   // 防抖后的关键字：停止输入 300ms 后才触发搜索
@@ -93,7 +95,7 @@ export default function TextureLibrary() {
         setItems(res.items)
         setTotal(res.total)
       } catch (err: any) {
-        if (seq === seqRef.current) toast.show(err?.message || '加载失败', 'err')
+        if (seq === seqRef.current) toast.show(err?.message || t('library.toast.loadFail'), 'err')
       } finally {
         if (seq === seqRef.current) setLoading(false)
       }
@@ -117,7 +119,7 @@ export default function TextureLibrary() {
         setCapeItems(res.items)
         setCapeTotal(res.total)
       } catch (err: any) {
-        if (seq === capeSeqRef.current) toast.show(err?.message || '加载失败', 'err')
+        if (seq === capeSeqRef.current) toast.show(err?.message || t('library.toast.loadFail'), 'err')
       } finally {
         if (seq === capeSeqRef.current) setCapeLoading(false)
       }
@@ -140,7 +142,7 @@ export default function TextureLibrary() {
         setYsmItems(res.items)
         setYsmTotal(res.total)
       } catch (err: any) {
-        if (seq === ysmSeqRef.current) toast.show(err?.message || '加载失败', 'err')
+        if (seq === ysmSeqRef.current) toast.show(err?.message || t('library.toast.loadFail'), 'err')
       } finally {
         if (seq === ysmSeqRef.current) setYsmLoading(false)
       }
@@ -149,24 +151,27 @@ export default function TextureLibrary() {
   )
 
   useEffect(() => {
+    if (tab !== 'skin') return
     load(page, search, activeTag)
-  }, [load, page, search, activeTag])
+  }, [tab, load, page, search, activeTag])
 
   useEffect(() => {
+    if (tab !== 'cape') return
     loadCape(page, search, activeTag)
-  }, [loadCape, page, search, activeTag])
+  }, [tab, loadCape, page, search, activeTag])
 
   useEffect(() => {
+    if (tab !== 'ysm') return
     loadYsm(page, search, activeTag)
-  }, [loadYsm, page, search, activeTag])
+  }, [tab, loadYsm, page, search, activeTag])
 
   async function copyItem(item: LibraryItem): Promise<number | null> {
     try {
       const res = await libraryApi.copy(item.id)
-      toast.show('已复制到我的仓库', 'ok')
+      toast.show(t('library.toast.copied'), 'ok')
       return res.texture.id
     } catch (err: any) {
-      toast.show(err.message || '复制失败', 'err')
+      toast.show(err.message || t('library.toast.copyFail'), 'err')
       return null
     }
   }
@@ -177,9 +182,9 @@ export default function TextureLibrary() {
     try {
       await authApi.setAvatar(tid)
       await refreshUser()
-      toast.show('已设为头像', 'ok')
+      toast.show(t('library.toast.avatarSet'), 'ok')
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '设置失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('library.toast.setFail'), 'err')
     }
   }
 
@@ -188,33 +193,33 @@ export default function TextureLibrary() {
     if (!tid) return
     try {
       await profileApi.bindTexture(profile.uuid, 'skin', tid)
-      toast.show(`已应用到 ${profile.name}`, 'ok')
+      toast.show(t('library.toast.applied', { name: profile.name }), 'ok')
       setPickerFor(null)
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '应用失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('library.toast.applyFail'), 'err')
+    }
+  }
+
+  async function setAsCape(item: LibraryItem, profile: Profile) {
+    const tid = await copyItem(item)
+    if (!tid) return
+    try {
+      await profileApi.bindTexture(profile.uuid, 'cape', tid)
+      toast.show(t('library.toast.applied', { name: profile.name }), 'ok')
+      setCapePickerFor(null)
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || t('library.toast.applyFail'), 'err')
     }
   }
 
   async function copyYsm(item: YsmLibraryItem): Promise<number | null> {
     try {
       const res = await ysmLibraryApi.copy(item.id)
-      toast.show('已复制到我的仓库', 'ok')
+      toast.show(t('library.toast.copied'), 'ok')
       return res.model.id
     } catch (err: any) {
-      toast.show(err.message || '复制失败', 'err')
+      toast.show(err.message || t('library.toast.copyFail'), 'err')
       return null
-    }
-  }
-
-  async function setAsYsm(item: YsmLibraryItem, profile: Profile) {
-    const mid = await copyYsm(item)
-    if (!mid) return
-    try {
-      await profileApi.bindYsm(profile.uuid, mid)
-      toast.show(`已应用到 ${profile.name}`, 'ok')
-      setYsmPickerFor(null)
-    } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '应用失败', 'err')
     }
   }
 
@@ -223,11 +228,11 @@ export default function TextureLibrary() {
     setReporting(true)
     try {
       await libraryApi.report(reportFor.id, reportReason.trim())
-      toast.show('举报已提交，等待管理员处理', 'ok')
+      toast.show(t('library.toast.reportSubmitted'), 'ok')
       setReportFor(null)
       setReportReason('')
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '举报失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('library.toast.reportFail'), 'err')
     } finally {
       setReporting(false)
     }
@@ -237,8 +242,8 @@ export default function TextureLibrary() {
     <div>
       <header className="page-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <h1 className="page-title">公共皮肤库</h1>
-          <p className="page-sub">浏览并获取玩家共享的皮肤、披风与 YSM 模型 · 共 {tab === 'skin' ? total : tab === 'cape' ? capeTotal : ysmTotal} 件</p>
+          <h1 className="page-title">{t('library.pageTitle')}</h1>
+          <p className="page-sub">{t('library.subtitle', { count: tab === 'skin' ? total : tab === 'cape' ? capeTotal : ysmTotal })}</p>
         </div>
         <span style={{ position: 'relative' }}>
           <Search
@@ -249,7 +254,7 @@ export default function TextureLibrary() {
           <input
             className="input"
             style={{ width: 220, paddingLeft: 36 }}
-            placeholder="搜索标题"
+            placeholder={t('library.searchPlaceholder')}
             value={keyword}
             onChange={(e) => {
               setPage(1)
@@ -262,9 +267,9 @@ export default function TextureLibrary() {
       <div style={{ marginBottom: 16 }}>
         <Segmented<'skin' | 'cape' | 'ysm'>
           options={[
-            { value: 'skin', label: '皮肤' },
-            { value: 'cape', label: '披风' },
-            { value: 'ysm', label: 'YSM 模型' },
+            { value: 'skin', label: t('library.tab.skin') },
+            { value: 'cape', label: t('library.tab.cape') },
+            { value: 'ysm', label: t('library.tab.ysm') },
           ]}
           value={tab}
           onChange={(v) => {
@@ -283,7 +288,7 @@ export default function TextureLibrary() {
               setPage(1)
             }}
           >
-            全部
+            {t('library.tagsAll')}
           </button>
           {tags.map((t) => (
             <button
@@ -303,9 +308,9 @@ export default function TextureLibrary() {
       {tab === 'skin' ? (
         <div className="panel" style={{ padding: '16px' }}>
           {loading ? (
-            <Spinner label="加载公共皮肤" />
+            <Spinner label={t('library.skin.loading')} />
           ) : items.length === 0 ? (
-            <div className="empty">暂无公共皮肤</div>
+            <div className="empty">{t('library.skin.empty')}</div>
           ) : (
             <>
               <div className="grid">
@@ -316,36 +321,36 @@ export default function TextureLibrary() {
                     capeUrl={item.texture?.type === 'cape' ? textureUrl(item.texture.hash) : undefined}
                     slim={item.texture?.model === 'slim'}
                     baseSkinUrl={baseSkinUrl}
-                    title={<span className="mono">{item.title || '未命名'}</span>}
+                    title={<span className="mono">{item.title || t('common.untitled')}</span>}
                     meta={
                       item.texture
-                        ? `${item.texture.type === 'skin' ? '皮肤' : '披风'} · ${item.texture.width}×${item.texture.height}${
+                        ? `${item.texture.type === 'skin' ? t('library.meta.skin') : t('library.meta.cape')} · ${item.texture.width}×${item.texture.height}${
                             item.tags.length ? ' · #' + item.tags.join(' #') : ''
                           }`
                         : '—'
                     }
                     actions={
                       <>
-                        <StatusTag kind={item.status === 'approved' ? 'on' : 'warn'}>{item.status}</StatusTag>
+                        <StatusTag kind={item.status === 'approved' ? 'on' : 'warn'}>{t(`commonStatus.${item.status}`, item.status)}</StatusTag>
                         <TextLink onClick={() => copyItem(item)}>
                           <Copy size="1em" strokeWidth={1.5} />
-                          <span className="lnk-txt">复制</span>
+                          <span className="lnk-txt">{t('library.action.copy')}</span>
                         </TextLink>
                         {item.texture?.type === 'skin' ? (
                           <TextLink onClick={() => setPickerFor(item)}>
                             <ImagePlus size="1em" strokeWidth={1.5} />
-                            <span className="lnk-txt">设为皮肤</span>
+                            <span className="lnk-txt">{t('library.action.setSkin')}</span>
                           </TextLink>
                         ) : null}
                         {item.texture?.type === 'skin' ? (
                           <TextLink onClick={() => setAsAvatar(item)}>
                             <UserRound size="1em" strokeWidth={1.5} />
-                            <span className="lnk-txt">设为头像</span>
+                            <span className="lnk-txt">{t('library.action.setAvatar')}</span>
                           </TextLink>
                         ) : null}
                         <TextLink danger onClick={() => setReportFor(item)}>
                           <Flag size="1em" strokeWidth={1.5} />
-                          <span className="lnk-txt">举报</span>
+                          <span className="lnk-txt">{t('library.action.report')}</span>
                         </TextLink>
                       </>
                     }
@@ -359,9 +364,9 @@ export default function TextureLibrary() {
       ) : tab === 'cape' ? (
         <div className="panel" style={{ padding: '16px' }}>
           {capeLoading ? (
-            <Spinner label="加载公共披风" />
+            <Spinner label={t('library.cape.loading')} />
           ) : capeItems.length === 0 ? (
-            <div className="empty">暂无公共披风</div>
+            <div className="empty">{t('library.cape.empty')}</div>
           ) : (
             <>
               <div className="grid">
@@ -371,24 +376,28 @@ export default function TextureLibrary() {
                     skinUrl={item.texture?.type === 'skin' ? textureUrl(item.texture.hash) : undefined}
                     capeUrl={item.texture?.type === 'cape' ? textureUrl(item.texture.hash) : undefined}
                     slim={item.texture?.model === 'slim'}
-                    title={<span className="mono">{item.title || '未命名'}</span>}
+                    title={<span className="mono">{item.title || t('common.untitled')}</span>}
                     meta={
                       item.texture
-                        ? `${item.texture.type === 'skin' ? '皮肤' : '披风'} · ${item.texture.width}×${item.texture.height}${
+                        ? `${item.texture.type === 'skin' ? t('library.meta.skin') : t('library.meta.cape')} · ${item.texture.width}×${item.texture.height}${
                             item.tags.length ? ' · #' + item.tags.join(' #') : ''
                           }`
                         : '—'
                     }
                     actions={
                       <>
-                        <StatusTag kind={item.status === 'approved' ? 'on' : 'warn'}>{item.status}</StatusTag>
+                        <StatusTag kind={item.status === 'approved' ? 'on' : 'warn'}>{t(`commonStatus.${item.status}`, item.status)}</StatusTag>
                         <TextLink onClick={() => copyItem(item)}>
                           <Copy size="1em" strokeWidth={1.5} />
-                          <span className="lnk-txt">复制</span>
+                          <span className="lnk-txt">{t('library.action.copy')}</span>
+                        </TextLink>
+                        <TextLink onClick={() => setCapePickerFor(item)}>
+                          <ImagePlus size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">{t('library.action.setCape')}</span>
                         </TextLink>
                         <TextLink danger onClick={() => setReportFor(item)}>
                           <Flag size="1em" strokeWidth={1.5} />
-                          <span className="lnk-txt">举报</span>
+                          <span className="lnk-txt">{t('library.action.report')}</span>
                         </TextLink>
                       </>
                     }
@@ -402,9 +411,9 @@ export default function TextureLibrary() {
       ) : (
         <div className="panel" style={{ padding: '16px' }}>
           {ysmLoading ? (
-            <Spinner label="加载公共 YSM 模型" />
+            <Spinner label={t('library.ysm.loading')} />
           ) : ysmItems.length === 0 ? (
-            <div className="empty">暂无公共 YSM 模型</div>
+            <div className="empty">{t('library.ysm.empty')}</div>
           ) : (
             <>
               <div className="grid">
@@ -419,8 +428,8 @@ export default function TextureLibrary() {
                     </div>
                     <div className="pcard-body">
                       <div className="pcard-title">
-                        <span className="mono">{item.title || item.model?.name || '未命名'}</span>
-                        <StatusTag kind={item.price_info === '免费' ? 'on' : 'warn'}>{item.price_info || '付费'}</StatusTag>
+                        <span className="mono">{item.title || item.model?.name || t('common.untitled')}</span>
+                        <StatusTag kind={item.price_info === '免费' ? 'on' : 'warn'}>{item.price_info || t('common.paid')}</StatusTag>
                       </div>
                       <div className="pcard-meta">
                         {item.model ? (
@@ -432,24 +441,20 @@ export default function TextureLibrary() {
                         ) : null}
                         {item.tags.length ? ' · #' + item.tags.join(' #') : ''}
                       </div>
-                      {item.usage_agreement ? <div className="pcard-meta">协议：{item.usage_agreement}</div> : null}
+                      {item.usage_agreement ? <div className="pcard-meta">{t('library.agreement', { text: item.usage_agreement })}</div> : null}
                       <div className="pcard-actions">
                         {item.is_free ? (
                           <>
                             <TextLink onClick={() => copyYsm(item)}>
                               <Copy size="1em" strokeWidth={1.5} />
-                              <span className="lnk-txt">复制</span>
-                            </TextLink>
-                            <TextLink onClick={() => setYsmPickerFor(item)}>
-                              <ImagePlus size="1em" strokeWidth={1.5} />
-                              <span className="lnk-txt">设为模型</span>
+                              <span className="lnk-txt">{t('library.action.copy')}</span>
                             </TextLink>
                           </>
                         ) : null}
-                        {!item.is_free && item.purchase_url ? (
-                          <a className="link-btn" href={item.purchase_url} target="_blank" rel="noreferrer">
+                        {!item.is_free && safeExternalUrl(item.purchase_url) ? (
+                          <a className="link-btn" href={safeExternalUrl(item.purchase_url)} target="_blank" rel="noreferrer">
                             <Download size="1em" strokeWidth={1.5} />
-                            <span className="lnk-txt">购买获取</span>
+                            <span className="lnk-txt">{t('library.action.purchase')}</span>
                           </a>
                         ) : null}
                       </div>
@@ -465,35 +470,35 @@ export default function TextureLibrary() {
 
       <ProfilePicker
         open={!!pickerFor}
-        title="设为皮肤 · 选择档案"
+        title={t('library.picker.skin.title')}
         onClose={() => setPickerFor(null)}
         onSelect={(profile) => pickerFor && setAsSkin(pickerFor, profile)}
       />
 
       <ProfilePicker
-        open={!!ysmPickerFor}
-        title="设为模型 · 选择档案"
-        onClose={() => setYsmPickerFor(null)}
-        onSelect={(profile) => ysmPickerFor && setAsYsm(ysmPickerFor, profile)}
+        open={!!capePickerFor}
+        title={t('library.picker.cape.title')}
+        onClose={() => setCapePickerFor(null)}
+        onSelect={(profile) => capePickerFor && setAsCape(capePickerFor, profile)}
       />
 
       <Modal
         open={!!reportFor}
-        title="举报皮肤"
+        title={t('library.report.title')}
         onClose={() => setReportFor(null)}
         footer={
           <>
             <Button variant="ghost" onClick={() => setReportFor(null)}>
-              取消
+              {t('library.report.cancel')}
             </Button>
             <Button variant="danger" disabled={reporting || !reportReason.trim()} onClick={submitReport}>
-              {reporting ? '提交中…' : '提交举报'}
+              {reporting ? t('library.report.submitting') : t('library.report.submit')}
             </Button>
           </>
         }
       >
-        <Field label="举报原因" hint="请描述违规原因，管理员将尽快处理">
-          <Textarea value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="例如：涉及版权 / 色情内容等" />
+        <Field label={t('library.report.reasonLabel')} hint={t('library.report.reasonHint')}>
+          <Textarea value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder={t('library.report.reasonPlaceholder')} />
         </Field>
       </Modal>
     </div>

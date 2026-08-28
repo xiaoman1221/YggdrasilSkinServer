@@ -125,6 +125,7 @@ export default {
     hint: 'Use email or username',
     field: {
       account: 'Email or username',
+      accountPlaceholder: 'you@example.com / Steve',
       password: 'Password',
     },
     btn: {
@@ -152,7 +153,9 @@ export default {
     hint: 'Create an account',
     field: {
       username: 'Username',
+      usernamePlaceholder: 'Steve',
       email: 'Email',
+      emailPlaceholder: 'you@example.com',
       password: 'Password',
       passwordHint: 'At least 6 characters',
     },
@@ -178,7 +181,7 @@ export default {
     tagline: 'Recover your password via the registered email.',
     title: 'Forgot Password',
     hint: 'Enter the registered email and we will send a reset link',
-    field: { email: 'Registered email' },
+    field: { email: 'Registered email', emailPlaceholder: 'you@example.com' },
     btn: { sending: 'Sending…', send: 'Send reset email' },
     sent: {
       title: 'Email sent',
@@ -269,6 +272,8 @@ export default {
       actionPremiumVerify: 'Premium verification',
       actionRename: 'Rename',
       actionUnbind: 'Unbind',
+      actionUnbindSkin: 'Unbind Skin',
+      actionUnbindCape: 'Unbind Cape',
       actionDelete: 'Delete',
     },
     modal: {
@@ -299,6 +304,9 @@ export default {
       oauthUrlFailed: 'Failed to get authorization URL',
       ysmUnbound: 'Unbound YSM model from {{name}}',
       ysmUnbindFailed: 'Failed to unbind',
+      unbindSkinOk: 'Unbound {{name}}\'s skin',
+      unbindCapeOk: 'Unbound {{name}}\'s cape',
+      unbindFailed: 'Failed to unbind',
     },
     confirm: {
       deleteProfile: 'Delete profile {{name}}? This action cannot be undone.',
@@ -500,6 +508,7 @@ export default {
       setSkin: 'Set as skin',
       setAvatar: 'Set as avatar',
       setModel: 'Set as model',
+      setCape: 'Set as Cape',
       purchase: 'Purchase',
       report: 'Report',
     },
@@ -507,6 +516,7 @@ export default {
     picker: {
       skin: { title: 'Set as Skin · Select Profile' },
       model: { title: 'Set as Model · Select Profile' },
+      cape: { title: 'Set as Cape · Choose Profile' },
     },
     report: {
       title: 'Report Skin',
@@ -541,6 +551,8 @@ export default {
     sectionCapes: 'Capes',
     sectionYsm: 'YSM Models',
     ysmDesc: 'Yes Steve Model files (.ysm / .zip). After uploading, bind them to a profile and get the download link, then place the file in your game directory under config/yes_steve_model/custom to use.',
+    uploadYsmBtn: 'Upload Model',
+    status: { pending: 'Pending', approved: 'In library', rejected: 'Rejected' },
     action: {
       setSkin: 'Set as skin',
       setAvatar: 'Set as avatar',
@@ -558,12 +570,15 @@ export default {
     picker: {
       skinTitle: 'Set as Skin · Select Profile',
       modelTitle: 'Set as Model · Select Profile',
+      capeTitle: 'Set as Cape · Choose Profile',
     },
     upload: {
       title: 'Upload Texture',
       close: 'Close',
       type: 'Type',
       model: 'Model',
+      modelClassic: 'Classic',
+      modelSlim: 'Slim',
       nameLabel: 'Name (optional)',
       namePlaceholder: 'Give this texture a name',
       descLabel: 'Description (optional)',
@@ -705,6 +720,9 @@ export default {
   admin: {
     title: 'Admin',
     noPermission: 'Your account does not have admin privileges.',
+    roleSuper: 'Super Admin (UID = 1)',
+    roleAdmin: 'Admin',
+    roleOperator: 'operator ({{perms}})',
     tabs: {
       settings: 'Site Settings',
       users: 'User Management',

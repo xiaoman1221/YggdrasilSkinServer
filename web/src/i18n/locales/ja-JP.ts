@@ -125,6 +125,7 @@ export default {
     hint: 'メールアドレスまたはユーザー名を使用',
     field: {
       account: 'メールアドレスまたはユーザー名',
+      accountPlaceholder: 'you@example.com / Steve',
       password: 'パスワード',
     },
     btn: {
@@ -152,7 +153,9 @@ export default {
     hint: 'サイトアカウントを作成',
     field: {
       username: 'ユーザー名',
+      usernamePlaceholder: 'Steve',
       email: 'メールアドレス',
+      emailPlaceholder: 'you@example.com',
       password: 'パスワード',
       passwordHint: '6文字以上',
     },
@@ -178,7 +181,7 @@ export default {
     tagline: '登録メールアドレスでパスワードを再設定します。',
     title: 'パスワードを忘れた',
     hint: '登録メールアドレスを入力してください。リセットリンクを送信します',
-    field: { email: '登録メールアドレス' },
+    field: { email: '登録メールアドレス', emailPlaceholder: 'you@example.com' },
     btn: { sending: '送信中…', send: 'リセットメールを送信' },
     sent: {
       title: 'メールを送信しました',
@@ -269,6 +272,8 @@ export default {
       actionPremiumVerify: '正規版認証',
       actionRename: '名前変更',
       actionUnbind: '連携解除',
+      actionUnbindSkin: 'スキンを解除',
+      actionUnbindCape: 'マントを解除',
       actionDelete: '削除',
     },
     modal: {
@@ -299,6 +304,9 @@ export default {
       oauthUrlFailed: '認証URLの取得に失敗しました',
       ysmUnbound: '{{name}} の YSM モデルの連携を解除しました',
       ysmUnbindFailed: '連携解除に失敗しました',
+      unbindSkinOk: '{{name}} のスキンを解除しました',
+      unbindCapeOk: '{{name}} のマントを解除しました',
+      unbindFailed: '解除に失敗しました',
     },
     confirm: {
       deleteProfile: 'プロフィール「{{name}}」を削除しますか？この操作は取り消せません。',
@@ -500,6 +508,7 @@ export default {
       setSkin: 'スキンに設定',
       setAvatar: 'アバターに設定',
       setModel: 'モデルに設定',
+      setCape: 'マントに設定',
       purchase: '購入して取得',
       report: '通報',
     },
@@ -507,6 +516,7 @@ export default {
     picker: {
       skin: { title: 'スキンに設定 · プロフィール選択' },
       model: { title: 'モデルに設定 · プロフィール選択' },
+      cape: { title: 'マントに設定 · プロフィールを選択' },
     },
     report: {
       title: 'スキンを通報',
@@ -541,6 +551,8 @@ export default {
     sectionCapes: 'マント',
     sectionYsm: 'YSM モデル',
     ysmDesc: 'Yes Steve Model モデル（.ysm / .zip）。アップロード後にプロフィールに連携し、ダウンロードリンクを取得。ゲームディレクトリの config/yes_steve_model/custom に配置すると使用できます',
+    uploadYsmBtn: 'モデルをアップロード',
+    status: { pending: '審査待ち', approved: '公開済み', rejected: '却下' },
     action: {
       setSkin: 'スキンに設定',
       setAvatar: 'アバターに設定',
@@ -558,12 +570,15 @@ export default {
     picker: {
       skinTitle: 'スキンに設定 · プロフィール選択',
       modelTitle: 'モデルに設定 · プロフィール選択',
+      capeTitle: 'マントに設定 · プロフィールを選択',
     },
     upload: {
       title: 'テクスチャをアップロード',
       close: '閉じる',
       type: 'タイプ',
       model: 'モデル',
+      modelClassic: 'クラシック',
+      modelSlim: 'スリム',
       nameLabel: '名前（任意）',
       namePlaceholder: 'このテクスチャの名前を入力',
       descLabel: '説明（任意）',
@@ -705,6 +720,9 @@ export default {
   admin: {
     title: '管理',
     noPermission: 'このアカウントには管理者権限がありません',
+    roleSuper: 'スーパー管理者（UID = 1）',
+    roleAdmin: '管理者',
+    roleOperator: 'operator（{{perms}}）',
     tabs: {
       settings: 'サイト設定',
       users: 'ユーザー管理',

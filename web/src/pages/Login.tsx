@@ -7,6 +7,7 @@ import { authApi, OAuthProvider } from '../api/auth'
 import { captchaApi } from '../api/captcha'
 import { Button, Field, Input } from '../components/ui'
 import AuthAside from '../components/AuthAside'
+import AuthLangSwitch from '../components/AuthLangSwitch'
 import CaptchaField, { CaptchaValue } from '../components/CaptchaField'
 import { useToast } from '../components/Toast'
 import { getPasskey } from '../lib/webauthn'
@@ -126,6 +127,7 @@ export default function Login() {
       />
 
       <main className="auth-main">
+        <AuthLangSwitch />
         <form className="auth-form" onSubmit={onSubmit}>
           <div>
             <h1>{t('login.title')}</h1>
@@ -136,7 +138,7 @@ export default function Login() {
               <Input
                 value={account}
                 onChange={(e) => setAccount(e.target.value)}
-                placeholder="you@example.com / Steve"
+                placeholder={t('login.field.accountPlaceholder')}
                 autoComplete="username"
                 autoFocus
               />

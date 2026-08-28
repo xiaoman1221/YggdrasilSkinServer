@@ -72,7 +72,6 @@ export function ProfilePicker({
               <span style={{ display: 'inline-flex', gap: 8 }}>
                 {p.skin_texture ? <StatusTag kind="on">{t('picker.tagSkin')}</StatusTag> : null}
                 {p.cape_texture ? <StatusTag kind="on">{t('picker.tagCape')}</StatusTag> : null}
-                {p.ysm_model ? <StatusTag kind="warn">{t('picker.tagYsm')}</StatusTag> : null}
               </span>
             </button>
           ))}

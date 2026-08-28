@@ -60,6 +60,7 @@ export default function SkinPreview3D({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const viewerRef = useRef<skinview3d.SkinViewer | null>(null)
   const [visible, setVisible] = useState(false)
+  const [inView, setInView] = useState(false)
   const [webgl, setWebgl] = useState(true)
   // 基础皮肤：优先用当前用户第一个档案的皮肤作为角色底子，否则回退默认 Steve
   const base = baseSkinUrl || stevePng
@@ -72,12 +73,13 @@ export default function SkinPreview3D({
   useEffect(() => {
     const el = canvasRef.current
     if (!el) return
+    // 持续观察：进入视口时创建渲染器，离开视口时暂停渲染循环，
+    // 避免列表中大量 3D 预览同时空转造成卡顿
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisible(true)
-          observer.disconnect()
-        }
+        const inter = entries[0]?.isIntersecting ?? false
+        setInView(inter)
+        if (inter) setVisible(true)
       },
       { rootMargin: '240px' },
     )
@@ -99,7 +101,8 @@ export default function SkinPreview3D({
       height,
       model: slim ? 'slim' : 'default',
       skin: base,
-      cape: capeUrl || undefined,
+      // 披风不在这里加载：非法尺寸（非 64×32）会让构造器产生未捕获拒绝，
+      // 统一交给下方已捕获的披风 effect 加载
     })
     viewerRef.current = viewer
     viewer.autoRotate = true
@@ -134,6 +137,13 @@ export default function SkinPreview3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, webgl, width, height])
 
+  // 离屏时暂停渲染与动画，降低 CPU/GPU 占用（进入视口自动恢复）
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    viewer.renderPaused = !inView
+  }, [inView])
+
   // 皮肤变化（请求序号防止快速切换时旧响应覆盖新皮肤）
   const skinReqRef = useRef(0)
   useEffect(() => {
@@ -150,12 +160,12 @@ export default function SkinPreview3D({
     })
   }, [skinUrl, slim, baseSkinUrl])
 
-  // 披风变化
+  // 披风变化（visible 使创建渲染器后立即加载；非法尺寸的拒绝已被捕获，不会产生未捕获异常）
   useEffect(() => {
     const viewer = viewerRef.current
-    if (!viewer) return
+    if (!viewer || !visible) return
     Promise.resolve(viewer.loadCape(capeUrl || null)).catch(() => {})
-  }, [capeUrl])
+  }, [capeUrl, visible])
 
   if (!webgl) {
     return (

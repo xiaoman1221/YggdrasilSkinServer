@@ -125,6 +125,7 @@ export default {
     hint: '이메일 또는 사용자 이름으로 로그인',
     field: {
       account: '이메일 또는 사용자 이름',
+      accountPlaceholder: 'you@example.com / Steve',
       password: '비밀번호',
     },
     btn: {
@@ -152,7 +153,9 @@ export default {
     hint: '사이트 계정 만들기',
     field: {
       username: '사용자 이름',
+      usernamePlaceholder: 'Steve',
       email: '이메일',
+      emailPlaceholder: 'you@example.com',
       password: '비밀번호',
       passwordHint: '6자 이상',
     },
@@ -178,7 +181,7 @@ export default {
     tagline: '가입한 이메일로 비밀번호를 찾습니다.',
     title: '비밀번호 찾기',
     hint: '가입한 이메일을 입력하시면 재설정 링크를 보내 드립니다',
-    field: { email: '가입한 이메일' },
+    field: { email: '가입한 이메일', emailPlaceholder: 'you@example.com' },
     btn: { sending: '전송 중…', send: '재설정 메일 보내기' },
     sent: {
       title: '메일이 전송되었습니다',
@@ -269,6 +272,8 @@ export default {
       actionPremiumVerify: '정품 인증',
       actionRename: '이름 변경',
       actionUnbind: '연동 해제',
+      actionUnbindSkin: '스킨 해제',
+      actionUnbindCape: '망토 해제',
       actionDelete: '삭제',
     },
     modal: {
@@ -299,6 +304,9 @@ export default {
       oauthUrlFailed: '인증 URL을 가져오지 못했습니다',
       ysmUnbound: '{{name}}의 YSM 모델 연동이 해제되었습니다',
       ysmUnbindFailed: '해제 실패',
+      unbindSkinOk: '{{name}}의 스킨을 해제했습니다',
+      unbindCapeOk: '{{name}}의 망토를 해제했습니다',
+      unbindFailed: '해제에 실패했습니다',
     },
     confirm: {
       deleteProfile: '프로필 {{name}}을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
@@ -500,6 +508,7 @@ export default {
       setSkin: '스킨으로 설정',
       setAvatar: '프로필 사진으로 설정',
       setModel: '모델로 설정',
+      setCape: '망토로 설정',
       purchase: '구매하여 가져오기',
       report: '신고',
     },
@@ -507,6 +516,7 @@ export default {
     picker: {
       skin: { title: '스킨으로 설정 · 프로필 선택' },
       model: { title: '모델로 설정 · 프로필 선택' },
+      cape: { title: '망토로 설정 · 프로필 선택' },
     },
     report: {
       title: '스킨 신고',
@@ -541,6 +551,8 @@ export default {
     sectionCapes: '망토',
     sectionYsm: 'YSM 모델',
     ysmDesc: 'Yes Steve Model 모델(.ysm / .zip). 업로드 후 프로필에 연결하고 다운로드 링크를 받아 게임 폴더의 config/yes_steve_model/custom에 넣으면 사용할 수 있습니다',
+    uploadYsmBtn: '모델 업로드',
+    status: { pending: '대기 중', approved: '등록됨', rejected: '거부됨' },
     action: {
       setSkin: '스킨으로 설정',
       setAvatar: '프로필 사진으로 설정',
@@ -558,12 +570,15 @@ export default {
     picker: {
       skinTitle: '스킨으로 설정 · 프로필 선택',
       modelTitle: '모델로 설정 · 프로필 선택',
+      capeTitle: '망토로 설정 · 프로필 선택',
     },
     upload: {
       title: '텍스처 업로드',
       close: '닫기',
       type: '유형',
       model: '모델',
+      modelClassic: '클래식',
+      modelSlim: '슬림',
       nameLabel: '이름 (선택)',
       namePlaceholder: '이 텍스처에 이름을 지어주세요',
       descLabel: '설명 (선택)',
@@ -705,6 +720,9 @@ export default {
   admin: {
     title: '관리',
     noPermission: '현재 계정에 관리 권한이 없습니다',
+    roleSuper: '슈퍼 관리자 (UID = 1)',
+    roleAdmin: '관리자',
+    roleOperator: 'operator（{{perms}}）',
     tabs: {
       settings: '사이트 설정',
       users: '사용자 관리',

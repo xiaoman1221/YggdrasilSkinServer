@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { authApi } from '../api/auth'
 import { Button, Field, Input } from '../components/ui'
 import AuthAside from '../components/AuthAside'
+import AuthLangSwitch from '../components/AuthLangSwitch'
 import { useToast } from '../components/Toast'
 
 export default function ResetPassword() {
@@ -47,6 +48,7 @@ export default function ResetPassword() {
     <div className="split-auth">
       <AuthAside tagline={t('resetPassword.tagline')} />
       <main className="auth-main">
+        <AuthLangSwitch />
         {done ? (
           <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
             <div>

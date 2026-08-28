@@ -43,7 +43,16 @@ export function firstFontFamily(stack: string): string {
 export function loadCustomFont(family: string, url: string): void {
   const name = firstFontFamily(family)
   if (!name || !url) return
-  const face = new FontFace(name, `url(${url})`)
+  // 仅允许 http(s) 地址并加引号包裹，避免 font_url 注入任意 CSS
+  let safeUrl = ''
+  try {
+    const u = new URL(url, window.location.origin)
+    if (u.protocol === 'http:' || u.protocol === 'https:') safeUrl = u.href
+  } catch {
+    /* ignore */
+  }
+  if (!safeUrl) return
+  const face = new FontFace(name, `url("${safeUrl}")`)
   face
     .load()
     .then((loaded) => {

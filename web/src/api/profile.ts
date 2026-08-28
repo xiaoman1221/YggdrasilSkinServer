@@ -72,17 +72,6 @@ export const profileApi = {
       url: `/profiles/minecraft/${uuid}/textures/${type}`,
     }),
 
-  bindYsm: (uuid: string, modelId: number) =>
-    request<{ profile: Profile }>({
-      method: 'PUT',
-      url: `/profiles/minecraft/${uuid}/ysm/${modelId}`,
-    }),
-
-  unbindYsm: (uuid: string) =>
-    request<{ profile: Profile }>({
-      method: 'DELETE',
-      url: `/profiles/minecraft/${uuid}/ysm`,
-    }),
 }
 
 export const wardrobeApi = {

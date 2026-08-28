@@ -188,6 +188,7 @@ YggdrasilSkinServer/
         ├── router/             # 路由
         ├── layouts/            # 主布局
         └── pages/              # 登录/注册/控制台/材质仓库/公共材质库
+
 ```
 
 ## 快速开始

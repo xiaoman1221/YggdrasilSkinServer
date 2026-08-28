@@ -125,6 +125,7 @@ export default {
     hint: 'Use e-mail ou nome de usuário',
     field: {
       account: 'E-mail ou nome de usuário',
+      accountPlaceholder: 'you@example.com / Steve',
       password: 'Senha',
     },
     btn: {
@@ -152,7 +153,9 @@ export default {
     hint: 'Criar uma conta no site',
     field: {
       username: 'Nome de usuário',
+      usernamePlaceholder: 'Steve',
       email: 'E-mail',
+      emailPlaceholder: 'you@example.com',
       password: 'Senha',
       passwordHint: 'Mínimo de 6 caracteres',
     },
@@ -178,7 +181,7 @@ export default {
     tagline: 'Recupere sua senha pelo e-mail de cadastro.',
     title: 'Esqueceu a senha',
     hint: 'Insira o e-mail de cadastro e enviaremos um link de redefinição',
-    field: { email: 'E-mail de cadastro' },
+    field: { email: 'E-mail de cadastro', emailPlaceholder: 'you@example.com' },
     btn: { sending: 'Enviando…', send: 'Enviar e-mail de redefinição' },
     sent: {
       title: 'E-mail enviado',
@@ -269,6 +272,8 @@ export default {
       actionPremiumVerify: 'Verificação premium',
       actionRename: 'Renomear',
       actionUnbind: 'Desvincular',
+      actionUnbindSkin: 'Desvincular skin',
+      actionUnbindCape: 'Desvincular capa',
       actionDelete: 'Excluir',
     },
     modal: {
@@ -299,6 +304,9 @@ export default {
       oauthUrlFailed: 'Falha ao obter URL de autorização',
       ysmUnbound: 'Modelo YSM de {{name}} desvinculado',
       ysmUnbindFailed: 'Falha ao desvincular',
+      unbindSkinOk: 'Skin de {{name}} desvinculado',
+      unbindCapeOk: 'Capa de {{name}} desvinculada',
+      unbindFailed: 'Falha ao desvincular',
     },
     confirm: {
       deleteProfile: 'Tem certeza de que deseja excluir o perfil {{name}}? Esta ação não pode ser desfeita.',
@@ -500,6 +508,7 @@ export default {
       setSkin: 'Definir como pele',
       setAvatar: 'Definir como avatar',
       setModel: 'Definir como modelo',
+      setCape: 'Definir como capa',
       purchase: 'Adquirir',
       report: 'Denunciar',
     },
@@ -507,6 +516,7 @@ export default {
     picker: {
       skin: { title: 'Definir como pele · Selecionar perfil' },
       model: { title: 'Definir como modelo · Selecionar perfil' },
+      cape: { title: 'Definir como capa · Escolher perfil' },
     },
     report: {
       title: 'Denunciar pele',
@@ -541,6 +551,8 @@ export default {
     sectionCapes: 'Capas',
     sectionYsm: 'Modelos YSM',
     ysmDesc: 'Modelos Yes Steve Model (.ysm / .zip). Após enviar, vincule a um perfil e obtenha o link de download. Coloque na pasta config/yes_steve_model/custom do jogo para usar.',
+    uploadYsmBtn: 'Enviar modelo',
+    status: { pending: 'Pendente', approved: 'Na biblioteca', rejected: 'Rejeitado' },
     action: {
       setSkin: 'Definir como pele',
       setAvatar: 'Definir como avatar',
@@ -558,12 +570,15 @@ export default {
     picker: {
       skinTitle: 'Definir como pele · Selecionar perfil',
       modelTitle: 'Definir como modelo · Selecionar perfil',
+      capeTitle: 'Definir como capa · Escolher perfil',
     },
     upload: {
       title: 'Enviar textura',
       close: 'Fechar',
       type: 'Tipo',
       model: 'Modelo',
+      modelClassic: 'Clássico',
+      modelSlim: 'Slim',
       nameLabel: 'Nome (opcional)',
       namePlaceholder: 'Dê um nome a esta textura',
       descLabel: 'Descrição (opcional)',
@@ -705,6 +720,9 @@ export default {
   admin: {
     title: 'Administração',
     noPermission: 'A conta atual não possui permissão de administrador',
+    roleSuper: 'Super administrador (UID = 1)',
+    roleAdmin: 'Administrador',
+    roleOperator: 'operador ({{perms}})',
     tabs: {
       settings: 'Configurações do site',
       users: 'Gerenciamento de usuários',

@@ -53,6 +53,12 @@ func (s *TextureService) Create(userID uint, texType, skinModel string, data []b
 	if err != nil {
 		return nil, err
 	}
+	if !validTextureSize(texType, width, height) {
+		if texType == model.TextureTypeCape {
+			return nil, fmt.Errorf("披风尺寸无效：%dx%d（应为 64×32）", width, height)
+		}
+		return nil, fmt.Errorf("皮肤尺寸无效：%dx%d（应为正方形，如 64×64，或旧版 64×32）", width, height)
+	}
 	hash := util.HashPNG(processed)
 
 	// 相同内容复用已有文件（同 hash 记录指向同一物理文件）
@@ -130,6 +136,23 @@ func (s *TextureService) UpdateMeta(id, ownerID uint, name, description string) 
 	texture.Name = truncate(strings.TrimSpace(name), 128)
 	texture.Description = truncate(strings.TrimSpace(description), 512)
 	return s.db.Save(&texture).Error
+}
+
+// validTextureSize 校验材质是否符合 Minecraft / skinview3d 可渲染的尺寸。
+// 皮肤：正方形（如 64×64）或 2:1 旧格式（64×32）；披风：2:1（64×32）或 22×17 / 46×22。
+// 与前端预览引擎 skinview-utils 的校验规则保持一致，避免非法尺寸导致 3D 预览报错。
+func validTextureSize(texType string, width, height int) bool {
+	if width <= 0 || height <= 0 {
+		return false
+	}
+	switch texType {
+	case model.TextureTypeSkin:
+		return width == height || width == 2*height
+	case model.TextureTypeCape:
+		return width == 2*height || (width == 22 && height == 17) || (width == 46 && height == 22)
+	default:
+		return false
+	}
 }
 
 // Get 按 ID 查询材质。

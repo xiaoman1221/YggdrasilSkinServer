@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../stores/auth'
 import AuthAside from '../components/AuthAside'
+import AuthLangSwitch from '../components/AuthLangSwitch'
 
 /**
  * OauthGo 授权回调落地页。
@@ -47,6 +48,7 @@ export default function OAuthCallback() {
     <div className="split-auth">
       <AuthAside tagline={t('oauthCallback.tagline')} />
       <main className="auth-main">
+        <AuthLangSwitch />
         <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
           {bound ? (
             <div>

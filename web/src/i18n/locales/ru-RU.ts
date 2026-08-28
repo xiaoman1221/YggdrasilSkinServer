@@ -125,6 +125,7 @@ export default {
     hint: 'Введите электронную почту или имя пользователя',
     field: {
       account: 'Электронная почта или имя пользователя',
+      accountPlaceholder: 'you@example.com / Steve',
       password: 'Пароль',
     },
     btn: {
@@ -152,7 +153,9 @@ export default {
     hint: 'Создайте аккаунт на сайте',
     field: {
       username: 'Имя пользователя',
+      usernamePlaceholder: 'Steve',
       email: 'Электронная почта',
+      emailPlaceholder: 'you@example.com',
       password: 'Пароль',
       passwordHint: 'Не менее 6 символов',
     },
@@ -178,7 +181,7 @@ export default {
     tagline: 'Восстановите пароль через почту, указанную при регистрации.',
     title: 'Забыли пароль',
     hint: 'Введите адрес электронной почты — мы отправим ссылку для сброса',
-    field: { email: 'Адрес электронной почты' },
+    field: { email: 'Адрес электронной почты', emailPlaceholder: 'you@example.com' },
     btn: { sending: 'Отправка…', send: 'Отправить письмо для сброса' },
     sent: {
       title: 'Письмо отправлено',
@@ -269,6 +272,8 @@ export default {
       actionPremiumVerify: 'Проверка премиума',
       actionRename: 'Переименовать',
       actionUnbind: 'Отвязать',
+      actionUnbindSkin: 'Отвязать скин',
+      actionUnbindCape: 'Отвязать плащ',
       actionDelete: 'Удалить',
     },
     modal: {
@@ -299,6 +304,9 @@ export default {
       oauthUrlFailed: 'Не удалось получить URL авторизации',
       ysmUnbound: 'YSM-модель {{name}} отвязана',
       ysmUnbindFailed: 'Ошибка отвязывания',
+      unbindSkinOk: 'Скин {{name}} отвязан',
+      unbindCapeOk: 'Плащ {{name}} отвязан',
+      unbindFailed: 'Не удалось отвязать',
     },
     confirm: {
       deleteProfile: 'Удалить профиль «{{name}}»? Это действие необратимо.',
@@ -500,6 +508,7 @@ export default {
       setSkin: 'Назначить скин',
       setAvatar: 'Назначить аватар',
       setModel: 'Назначить модель',
+      setCape: 'Установить как плащ',
       purchase: 'Приобрести',
       report: 'Пожаловаться',
     },
@@ -507,6 +516,7 @@ export default {
     picker: {
       skin: { title: 'Назначить скин · Выбор профиля' },
       model: { title: 'Назначить модель · Выбор профиля' },
+      cape: { title: 'Установить как плащ · Выберите профиль' },
     },
     report: {
       title: 'Жалоба на скин',
@@ -541,6 +551,8 @@ export default {
     sectionCapes: 'Плащи',
     sectionYsm: 'YSM-модели',
     ysmDesc: 'Модели Yes Steve Model (.ysm / .zip). После загрузки привяжите профиль и получите ссылку для скачивания. Разместите файл в папке config/yes_steve_model/custom в каталоге игры.',
+    uploadYsmBtn: 'Загрузить модель',
+    status: { pending: 'Ожидает', approved: 'В библиотеке', rejected: 'Отклонено' },
     action: {
       setSkin: 'Назначить скин',
       setAvatar: 'Назначить аватар',
@@ -558,12 +570,15 @@ export default {
     picker: {
       skinTitle: 'Назначить скин · Выбор профиля',
       modelTitle: 'Назначить модель · Выбор профиля',
+      capeTitle: 'Установить как плащ · Выберите профиль',
     },
     upload: {
       title: 'Загрузка текстуры',
       close: 'Закрыть',
       type: 'Тип',
       model: 'Модель',
+      modelClassic: 'Классический',
+      modelSlim: 'Слим',
       nameLabel: 'Название (необязательно)',
       namePlaceholder: 'Назовите эту текстуру',
       descLabel: 'Описание (необязательно)',
@@ -705,6 +720,9 @@ export default {
   admin: {
     title: 'Управление',
     noPermission: 'У вас нет прав доступа к панели управления.',
+    roleSuper: 'Супер-администратор (UID = 1)',
+    roleAdmin: 'Администратор',
+    roleOperator: 'оператор ({{perms}})',
     tabs: {
       settings: 'Настройки сайта',
       users: 'Пользователи',

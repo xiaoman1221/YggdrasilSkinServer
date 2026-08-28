@@ -125,6 +125,7 @@ export default {
     hint: '使用邮箱或用户名',
     field: {
       account: '邮箱或用户名',
+      accountPlaceholder: 'you@example.com / Steve',
       password: '密码',
     },
     btn: {
@@ -152,7 +153,9 @@ export default {
     hint: '创建站点账号',
     field: {
       username: '用户名',
+      usernamePlaceholder: 'Steve',
       email: '邮箱',
+      emailPlaceholder: 'you@example.com',
       password: '密码',
       passwordHint: '至少 6 位',
     },
@@ -178,7 +181,7 @@ export default {
     tagline: '通过注册邮箱找回密码。',
     title: '忘记密码',
     hint: '输入注册邮箱，我们将发送重置链接',
-    field: { email: '注册邮箱' },
+    field: { email: '注册邮箱', emailPlaceholder: 'you@example.com' },
     btn: { sending: '发送中…', send: '发送重置邮件' },
     sent: {
       title: '邮件已发送',
@@ -269,6 +272,8 @@ export default {
       actionPremiumVerify: '正版认证',
       actionRename: '改名',
       actionUnbind: '解绑',
+      actionUnbindSkin: '解绑皮肤',
+      actionUnbindCape: '解绑披风',
       actionDelete: '删除',
     },
     modal: {
@@ -299,6 +304,9 @@ export default {
       oauthUrlFailed: '获取授权地址失败',
       ysmUnbound: '已解除 {{name}} 的 YSM 模型',
       ysmUnbindFailed: '解除失败',
+      unbindSkinOk: '已解除 {{name}} 的皮肤',
+      unbindCapeOk: '已解除 {{name}} 的披风',
+      unbindFailed: '解除失败',
     },
     confirm: {
       deleteProfile: '确认删除档案 {{name}}？此操作不可撤销。',
@@ -500,6 +508,7 @@ export default {
       setSkin: '设为皮肤',
       setAvatar: '设为头像',
       setModel: '设为模型',
+      setCape: '设为披风',
       purchase: '购买获取',
       report: '举报',
     },
@@ -507,6 +516,7 @@ export default {
     picker: {
       skin: { title: '设为皮肤 · 选择档案' },
       model: { title: '设为模型 · 选择档案' },
+      cape: { title: '设为披风 · 选择档案' },
     },
     report: {
       title: '举报皮肤',
@@ -541,6 +551,8 @@ export default {
     sectionCapes: '披风',
     sectionYsm: 'YSM 模型',
     ysmDesc: 'Yes Steve Model 模型（.ysm / .zip）。上传后绑定档案并获取下载链接，放入游戏目录 config/yes_steve_model/custom 即可使用',
+    uploadYsmBtn: '上传模型',
+    status: { pending: '待审核', approved: '已入库', rejected: '已驳回' },
     action: {
       setSkin: '设为皮肤',
       setAvatar: '设为头像',
@@ -558,12 +570,15 @@ export default {
     picker: {
       skinTitle: '设为皮肤 · 选择档案',
       modelTitle: '设为模型 · 选择档案',
+      capeTitle: '设为披风 · 选择档案',
     },
     upload: {
       title: '上传材质',
       close: '关闭',
       type: '类型',
       model: '模型',
+      modelClassic: '经典',
+      modelSlim: '纤细',
       nameLabel: '名称（可选）',
       namePlaceholder: '给这份材质起个名字',
       descLabel: '描述（可选）',
@@ -705,6 +720,9 @@ export default {
   admin: {
     title: '管理',
     noPermission: '当前账号无管理权限',
+    roleSuper: '超级管理员（UID = 1）',
+    roleAdmin: '管理员',
+    roleOperator: 'operator（{{perms}}）',
     tabs: {
       settings: '站点设置',
       users: '用户管理',

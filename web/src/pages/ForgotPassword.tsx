@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { authApi } from '../api/auth'
 import { Button, Field, Input } from '../components/ui'
 import AuthAside from '../components/AuthAside'
+import AuthLangSwitch from '../components/AuthLangSwitch'
 import { useToast } from '../components/Toast'
 
 export default function ForgotPassword() {
@@ -31,6 +32,7 @@ export default function ForgotPassword() {
     <div className="split-auth">
       <AuthAside tagline={t('forgotPassword.tagline')} />
       <main className="auth-main">
+        <AuthLangSwitch />
         {sent ? (
           <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
             <div>
@@ -53,7 +55,7 @@ export default function ForgotPassword() {
                   className="mono"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder={t('forgotPassword.field.emailPlaceholder')}
                   autoFocus
                 />
               </Field>

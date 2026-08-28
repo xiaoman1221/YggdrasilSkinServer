@@ -113,6 +113,11 @@ func (s *YsmService) Create(userID uint, name, description string, data []byte, 
 		}
 	}
 
+	// 购买/赞助链接必须为 http(s) 地址，防止 javascript: 等协议被存储后在前端渲染成可执行链接
+	if err := validateYsmPurchaseURL(meta.PurchaseURL); err != nil {
+		return nil, err
+	}
+
 	ysm := &model.YsmModel{
 		UserID:         userID,
 		Name:           name,
@@ -163,6 +168,9 @@ func (s *YsmService) UpdateMeta(id, ownerID uint, name, description string, meta
 	}
 	if description = strings.TrimSpace(description); description != "" || name != "" {
 		ysm.Description = truncate(description, 512)
+	}
+	if err := validateYsmPurchaseURL(meta.PurchaseURL); err != nil {
+		return err
 	}
 	ysm.UsageAgreement = truncate(strings.TrimSpace(meta.UsageAgreement), 512)
 	ysm.PurchaseURL = truncate(strings.TrimSpace(meta.PurchaseURL), 512)

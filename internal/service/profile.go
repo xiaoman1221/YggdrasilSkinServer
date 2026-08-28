@@ -122,16 +122,20 @@ func (s *ProfileService) BindTexture(profile *model.Profile, texture *model.Text
 }
 
 // UnbindTexture 解绑档案上的皮肤/披风。
+// 注意：GORM 的 Save 不会把 nil 指针字段写为 NULL，必须用显式 Update 才能清空外键。
 func (s *ProfileService) UnbindTexture(profile *model.Profile, texType string) error {
 	switch texType {
 	case model.TextureTypeSkin:
 		profile.SkinTextureID = nil
+		profile.SkinTexture = nil
+		return s.db.Model(profile).Update("skin_texture_id", nil).Error
 	case model.TextureTypeCape:
 		profile.CapeTextureID = nil
+		profile.CapeTexture = nil
+		return s.db.Model(profile).Update("cape_texture_id", nil).Error
 	default:
 		return ErrInvalidTextureType
 	}
-	return s.db.Save(profile).Error
 }
 
 // BindYsmModel 把 YSM 模型绑定到档案。
@@ -146,7 +150,8 @@ func (s *ProfileService) BindYsmModel(profile *model.Profile, ysm *model.YsmMode
 // UnbindYsmModel 解绑档案上的 YSM 模型。
 func (s *ProfileService) UnbindYsmModel(profile *model.Profile) error {
 	profile.YsmModelID = nil
-	return s.db.Save(profile).Error
+	profile.YsmModel = nil
+	return s.db.Model(profile).Update("ysm_model_id", nil).Error
 }
 
 // Rename 受控改名：保留 UUID 与材质绑定，写入审计，并使绑定该档案的 Yggdrasil token 失效。

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { siteApi } from '../api/site'
+import { useTranslation } from 'react-i18next'
 
 let cachedImages: string[] | null = null
 
@@ -14,6 +15,7 @@ export default function AuthAside({
   wordmark?: string
   tagline?: React.ReactNode
 }) {
+  const { t } = useTranslation()
   const [bg, setBg] = useState('')
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function AuthAside({
         <div className="wordmark">{wordmark}</div>
         {tagline ? <p className="tagline">{tagline}</p> : null}
       </div>
-      <div className="foot">YggdrasilSkinServer</div>
+      <div className="foot">{t('authAside.footer')}</div>
     </aside>
   )
 }

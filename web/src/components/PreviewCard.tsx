@@ -9,6 +9,7 @@ export function PreviewCard({
   skinUrl,
   capeUrl,
   slim,
+  baseSkinUrl,
   title,
   meta,
   actions,
@@ -17,6 +18,7 @@ export function PreviewCard({
   skinUrl?: string | null
   capeUrl?: string | null
   slim?: boolean
+  baseSkinUrl?: string | null
   title: ReactNode
   meta?: ReactNode
   actions?: ReactNode
@@ -25,7 +27,14 @@ export function PreviewCard({
   return (
     <div className="pcard">
       <div className="pcard-stage">
-        <SkinPreview3D skinUrl={skinUrl} capeUrl={capeUrl} slim={slim} width={176} height={216} />
+        <SkinPreview3D
+          skinUrl={skinUrl}
+          capeUrl={capeUrl}
+          slim={slim}
+          baseSkinUrl={baseSkinUrl}
+          width={176}
+          height={216}
+        />
         {!skinUrl ? <span className="pcard-empty">{emptyText || '未设置皮肤'}</span> : null}
       </div>
       <div className="pcard-body">

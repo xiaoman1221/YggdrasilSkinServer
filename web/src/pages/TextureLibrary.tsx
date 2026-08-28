@@ -15,7 +15,20 @@ const PAGE_SIZE = 12
 export default function TextureLibrary() {
   const { refreshUser } = useAuth()
   const toast = useToast()
-  const [tab, setTab] = useState<'skin' | 'ysm'>('skin')
+  const [tab, setTab] = useState<'skin' | 'cape' | 'ysm'>('skin')
+
+  // 当前用户第一个档案的皮肤，作为公共库皮肤的“基础模型”（试穿用）
+  const [baseSkinUrl, setBaseSkinUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    profileApi
+      .list()
+      .then((res) => {
+        const first = res.profiles?.[0]
+        if (first?.skin_texture?.hash) setBaseSkinUrl(textureUrl(first.skin_texture.hash))
+      })
+      .catch(() => {})
+  }, [])
 
   // 皮肤
   const [items, setItems] = useState<LibraryItem[]>([])
@@ -26,6 +39,12 @@ export default function TextureLibrary() {
   const [reportFor, setReportFor] = useState<LibraryItem | null>(null)
   const [reportReason, setReportReason] = useState('')
   const [reporting, setReporting] = useState(false)
+
+  // 披风
+  const [capeItems, setCapeItems] = useState<LibraryItem[]>([])
+  const [capeTotal, setCapeTotal] = useState(0)
+  const [capeLoading, setCapeLoading] = useState(true)
+  const capeSeqRef = useRef(0)
 
   // YSM 模型
   const [ysmItems, setYsmItems] = useState<YsmLibraryItem[]>([])
@@ -40,6 +59,8 @@ export default function TextureLibrary() {
   const [page, setPage] = useState(1)
   const [tags, setTags] = useState<TextureTag[]>([])
   const [activeTag, setActiveTag] = useState('')
+
+  const tabType = tab === 'cape' ? 'cape' : 'skin'
 
   useEffect(() => {
     libraryApi
@@ -62,6 +83,7 @@ export default function TextureLibrary() {
       setLoading(true)
       try {
         const res = await libraryApi.list({
+          type: 'skin',
           limit: PAGE_SIZE,
           offset: (p - 1) * PAGE_SIZE,
           ...(kw ? { keyword: kw } : {}),
@@ -74,6 +96,30 @@ export default function TextureLibrary() {
         if (seq === seqRef.current) toast.show(err?.message || '加载失败', 'err')
       } finally {
         if (seq === seqRef.current) setLoading(false)
+      }
+    },
+    [toast],
+  )
+
+  const loadCape = useCallback(
+    async (p: number, kw: string, tag: string) => {
+      const seq = ++capeSeqRef.current
+      setCapeLoading(true)
+      try {
+        const res = await libraryApi.list({
+          type: 'cape',
+          limit: PAGE_SIZE,
+          offset: (p - 1) * PAGE_SIZE,
+          ...(kw ? { keyword: kw } : {}),
+          ...(tag ? { tag } : {}),
+        })
+        if (seq !== capeSeqRef.current) return
+        setCapeItems(res.items)
+        setCapeTotal(res.total)
+      } catch (err: any) {
+        if (seq === capeSeqRef.current) toast.show(err?.message || '加载失败', 'err')
+      } finally {
+        if (seq === capeSeqRef.current) setCapeLoading(false)
       }
     },
     [toast],
@@ -105,6 +151,10 @@ export default function TextureLibrary() {
   useEffect(() => {
     load(page, search, activeTag)
   }, [load, page, search, activeTag])
+
+  useEffect(() => {
+    loadCape(page, search, activeTag)
+  }, [loadCape, page, search, activeTag])
 
   useEffect(() => {
     loadYsm(page, search, activeTag)
@@ -188,7 +238,7 @@ export default function TextureLibrary() {
       <header className="page-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <h1 className="page-title">公共皮肤库</h1>
-          <p className="page-sub">浏览并获取玩家共享的皮肤与 YSM 模型 · 共 {tab === 'skin' ? total : ysmTotal} 件</p>
+          <p className="page-sub">浏览并获取玩家共享的皮肤、披风与 YSM 模型 · 共 {tab === 'skin' ? total : tab === 'cape' ? capeTotal : ysmTotal} 件</p>
         </div>
         <span style={{ position: 'relative' }}>
           <Search
@@ -210,9 +260,10 @@ export default function TextureLibrary() {
       </header>
 
       <div style={{ marginBottom: 16 }}>
-        <Segmented<'skin' | 'ysm'>
+        <Segmented<'skin' | 'cape' | 'ysm'>
           options={[
             { value: 'skin', label: '皮肤' },
+            { value: 'cape', label: '披风' },
             { value: 'ysm', label: 'YSM 模型' },
           ]}
           value={tab}
@@ -264,6 +315,7 @@ export default function TextureLibrary() {
                     skinUrl={item.texture?.type === 'skin' ? textureUrl(item.texture.hash) : undefined}
                     capeUrl={item.texture?.type === 'cape' ? textureUrl(item.texture.hash) : undefined}
                     slim={item.texture?.model === 'slim'}
+                    baseSkinUrl={baseSkinUrl}
                     title={<span className="mono">{item.title || '未命名'}</span>}
                     meta={
                       item.texture
@@ -301,6 +353,49 @@ export default function TextureLibrary() {
                 ))}
               </div>
               <Pager page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
+            </>
+          )}
+        </div>
+      ) : tab === 'cape' ? (
+        <div className="panel" style={{ padding: '16px' }}>
+          {capeLoading ? (
+            <Spinner label="加载公共披风" />
+          ) : capeItems.length === 0 ? (
+            <div className="empty">暂无公共披风</div>
+          ) : (
+            <>
+              <div className="grid">
+                {capeItems.map((item) => (
+                  <PreviewCard
+                    key={item.id}
+                    skinUrl={item.texture?.type === 'skin' ? textureUrl(item.texture.hash) : undefined}
+                    capeUrl={item.texture?.type === 'cape' ? textureUrl(item.texture.hash) : undefined}
+                    slim={item.texture?.model === 'slim'}
+                    title={<span className="mono">{item.title || '未命名'}</span>}
+                    meta={
+                      item.texture
+                        ? `${item.texture.type === 'skin' ? '皮肤' : '披风'} · ${item.texture.width}×${item.texture.height}${
+                            item.tags.length ? ' · #' + item.tags.join(' #') : ''
+                          }`
+                        : '—'
+                    }
+                    actions={
+                      <>
+                        <StatusTag kind={item.status === 'approved' ? 'on' : 'warn'}>{item.status}</StatusTag>
+                        <TextLink onClick={() => copyItem(item)}>
+                          <Copy size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">复制</span>
+                        </TextLink>
+                        <TextLink danger onClick={() => setReportFor(item)}>
+                          <Flag size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">举报</span>
+                        </TextLink>
+                      </>
+                    }
+                  />
+                ))}
+              </div>
+              <Pager page={page} total={capeTotal} pageSize={PAGE_SIZE} onChange={setPage} />
             </>
           )}
         </div>

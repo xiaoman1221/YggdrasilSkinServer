@@ -9,6 +9,7 @@ interface SkinPreview3DProps {
   width?: number
   height?: number
   className?: string
+  baseSkinUrl?: string | null
 }
 
 function webglSupported(): boolean {
@@ -52,12 +53,15 @@ export default function SkinPreview3D({
   width = 176,
   height = 216,
   className = '',
+  baseSkinUrl,
 }: SkinPreview3DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const viewerRef = useRef<skinview3d.SkinViewer | null>(null)
   const [visible, setVisible] = useState(false)
   const [webgl, setWebgl] = useState(true)
-  const fallback = skinUrl || stevePng
+  // 基础皮肤：优先用当前用户第一个档案的皮肤作为角色底子，否则回退默认 Steve
+  const base = baseSkinUrl || stevePng
+  const fallback = skinUrl || base
 
   useEffect(() => {
     setWebgl(webglSupported())
@@ -92,7 +96,7 @@ export default function SkinPreview3D({
       width,
       height,
       model: slim ? 'slim' : 'default',
-      skin: stevePng,
+      skin: base,
       cape: capeUrl || undefined,
     })
     viewerRef.current = viewer
@@ -110,10 +114,10 @@ export default function SkinPreview3D({
 
     if (skinUrl) {
       viewer.loadSkin(skinUrl, { model: slim ? 'slim' : 'default' }).catch(() => {
-        // 远程皮肤加载失败 → 回退默认 Steve（组件已卸载时不再操作）
+        // 远程皮肤加载失败 → 回退基础皮肤（组件已卸载时不再操作）
         if (disposed) return
         try {
-          viewer.loadSkin(stevePng, { model: slim ? 'slim' : 'default' })
+          viewer.loadSkin(base, { model: slim ? 'slim' : 'default' })
         } catch {
           /* ignore */
         }
@@ -137,12 +141,12 @@ export default function SkinPreview3D({
     viewer.loadSkin(skinUrl, { model: slim ? 'slim' : 'default' }).catch(() => {
       if (req !== skinReqRef.current || !viewerRef.current) return
       try {
-        viewer.loadSkin(stevePng, { model: slim ? 'slim' : 'default' })
+        viewer.loadSkin(baseSkinUrl || stevePng, { model: slim ? 'slim' : 'default' })
       } catch {
         /* ignore */
       }
     })
-  }, [skinUrl, slim])
+  }, [skinUrl, slim, baseSkinUrl])
 
   // 披风变化
   useEffect(() => {

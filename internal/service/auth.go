@@ -92,10 +92,11 @@ func (s *AuthService) Setup(username, email, password string) (*model.User, erro
 		return nil, err
 	}
 	user := &model.User{
-		Email:        email,
-		Username:     username,
-		PasswordHash: hash,
-		Permissions:  "admin",
+		Email:          email,
+		Username:       username,
+		PasswordHash:   hash,
+		Permissions:    "admin",
+		YggdrasilUUID:  util.NewUUID(),
 	}
 	if err := s.db.Create(user).Error; err != nil {
 		return nil, err
@@ -127,10 +128,11 @@ func (s *AuthService) Register(email, username, password string) (*model.User, e
 		return nil, err
 	}
 	user := &model.User{
-		Email:        email,
-		Username:     username,
-		PasswordHash: hash,
-		Permissions:  "user",
+		Email:         email,
+		Username:      username,
+		PasswordHash:  hash,
+		Permissions:   "user",
+		YggdrasilUUID: util.NewUUID(),
 	}
 	if err := s.db.Create(user).Error; err != nil {
 		return nil, err
@@ -507,11 +509,12 @@ func (s *AuthService) FindOrCreateOAuthUser(oauthType, openid, nickname, email, 
 		username = username[:min(10, len(username))] + "_" + util.RandomToken()[:4]
 	}
 	newUser := &model.User{
-		Email:        strings.ToLower(email),
-		Username:     username,
-		PasswordHash: hash,
-		Permissions:  "user",
-		AvatarURL:    avatar,
+		Email:         strings.ToLower(email),
+		Username:      username,
+		PasswordHash:  hash,
+		Permissions:   "user",
+		AvatarURL:     avatar,
+		YggdrasilUUID: util.NewUUID(),
 	}
 	if err := s.db.Create(newUser).Error; err != nil {
 		return nil, false, err

@@ -261,7 +261,8 @@ func (h *AdminHandler) DeleteProfile(c *gin.Context) {
 func (h *AdminHandler) LibraryTextures(c *gin.Context) {
 	limit, offset := pagination(c)
 	status := c.Query("status")
-	items, total, err := h.librarySvc.ListTextures(status, c.Query("tag"), "", limit, offset)
+	texType := c.Query("type")
+	items, total, err := h.librarySvc.ListTextures(status, texType, c.Query("tag"), "", limit, offset)
 	if err != nil {
 		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
 		return

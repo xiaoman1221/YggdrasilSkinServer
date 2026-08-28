@@ -26,6 +26,9 @@ type User struct {
 	MojangUUID string `gorm:"size:36" json:"mojang_uuid"`
 	// MojangName 绑定的正版账号名
 	MojangName string `gorm:"size:16" json:"mojang_name"`
+	// YggdrasilUUID 站点账号在 Yggdrasil 协议中的稳定用户 UUID（区别于各 Minecraft 档案 UUID）。
+	// 创建站点账号时生成并持久化，保证 authenticate/refresh 返回的 user.id 恒定。
+	YggdrasilUUID string `gorm:"size:36;index" json:"-"`
 	// OAuthType 第三方登录类型（OauthGo，如 gitee/qq；空表示未绑定）
 	OAuthType string `gorm:"size:32;index" json:"oauth_type"`
 	// OAuthOpenID 第三方平台用户唯一标识

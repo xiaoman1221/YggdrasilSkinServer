@@ -37,12 +37,16 @@ func (s *TextureLibraryService) ListTags() ([]model.TextureTag, error) {
 	return tags, err
 }
 
-// ListTextures 分页查询公共材质库条目（默认仅已审核通过的，支持标题关键字过滤）。
-func (s *TextureLibraryService) ListTextures(status, tag, keyword string, limit, offset int) ([]model.TextureLibraryItem, int64, error) {
+// ListTextures 分页查询公共材质库条目（默认仅已审核通过的，支持类型/标题关键字/标签过滤）。
+func (s *TextureLibraryService) ListTextures(status, texType, tag, keyword string, limit, offset int) ([]model.TextureLibraryItem, int64, error) {
 	if status == "" {
 		status = model.LibraryStatusApproved
 	}
 	q := s.db.Model(&model.TextureLibraryItem{}).Preload("Tags").Preload("Texture")
+	if texType != "" {
+		q = q.Joins("JOIN textures ON textures.id = texture_library_items.texture_id").
+			Where("textures.type = ?", texType)
+	}
 	if tag != "" {
 		q = q.Joins("JOIN texture_library_item_tags tlit ON tlit.texture_library_item_id = texture_library_items.id").
 			Joins("JOIN texture_tags tt ON tt.id = tlit.texture_tag_id").
@@ -77,8 +81,8 @@ func (s *TextureLibraryService) GetTexture(itemID uint) (*model.TextureLibraryIt
 	return &item, nil
 }
 
-// Submit 提交 wardrobe 皮肤到公共皮肤库（待审核）。
-// 仅允许皮肤；usageAgreement（授权声明/使用协议）必填。
+// Submit 提交 wardrobe 皮肤/披风到公共皮肤库（待审核）。
+// usageAgreement（授权声明/使用协议）必填。
 func (s *TextureLibraryService) Submit(userID uint, textureID uint, title, usageAgreement string, tagNames []string) (*model.TextureLibraryItem, error) {
 	var texture model.Texture
 	if err := s.db.First(&texture, textureID).Error; err != nil {
@@ -86,9 +90,6 @@ func (s *TextureLibraryService) Submit(userID uint, textureID uint, title, usage
 	}
 	if texture.UserID != userID {
 		return nil, errors.New("not allowed to submit this texture")
-	}
-	if texture.Type != model.TextureTypeSkin {
-		return nil, errors.New("公共皮肤库仅支持皮肤，披风无法申请入库")
 	}
 	usageAgreement = strings.TrimSpace(usageAgreement)
 	if usageAgreement == "" {

@@ -32,7 +32,7 @@ export interface YsmLibraryItem {
 export const libraryApi = {
   tags: () => request<{ tags: TextureTag[] }>({ method: 'GET', url: '/texture-library/tags' }),
 
-  list: (params?: { status?: string; tag?: string; keyword?: string; limit?: number; offset?: number }) =>
+  list: (params?: { status?: string; type?: string; tag?: string; keyword?: string; limit?: number; offset?: number }) =>
     request<{ items: LibraryItem[]; total: number }>({
       method: 'GET',
       url: '/texture-library/textures',

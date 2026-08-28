@@ -33,11 +33,15 @@ func (h *TextureLibraryHandler) Tags(c *gin.Context) {
 	c.JSON(http.StatusOK, envelope.OK(gin.H{"tags": tags}))
 }
 
-// List GET /api/v1/texture-library/textures
+// List GET /api/v1/texture-library/textures?type=skin|cape
 func (h *TextureLibraryHandler) List(c *gin.Context) {
 	limit, offset := pagination(c)
 	// 公开列表仅展示已审核通过的内容，不暴露 pending/rejected 等状态
-	items, total, err := h.librarySvc.ListTextures(model.LibraryStatusApproved, c.Query("tag"), c.Query("keyword"), limit, offset)
+	texType := c.Query("type")
+	if texType != model.TextureTypeSkin && texType != model.TextureTypeCape {
+		texType = ""
+	}
+	items, total, err := h.librarySvc.ListTextures(model.LibraryStatusApproved, texType, c.Query("tag"), c.Query("keyword"), limit, offset)
 	if err != nil {
 		writeEnvelopeError(c, envelope.CodeInternalError, err.Error())
 		return

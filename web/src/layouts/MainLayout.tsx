@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { History, LayoutDashboard, LogOut, Palette, Shield, Store } from 'lucide-react'
 import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../stores/auth'
 import { siteApi } from '../api/site'
 import { Spinner } from '../components/ui'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 import { assetUrl } from '../utils/format'
 
 export default function MainLayout() {
   const { user, loading, logout } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [siteName, setSiteName] = useState('YSS')
 
@@ -22,7 +25,7 @@ export default function MainLayout() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-        <Spinner label="正在读取会话" />
+        <Spinner label={t('layout.loadingSession')} />
       </div>
     )
   }
@@ -38,10 +41,10 @@ export default function MainLayout() {
   const canManage = isAdmin || perms.includes('texture_library') || perms.includes('user_manage')
 
   const navItems = [
-    { to: '/', label: '控制台', icon: <LayoutDashboard size={17} strokeWidth={1.5} />, end: true },
-    { to: '/wardrobe', label: '个人皮肤', icon: <Palette size={17} strokeWidth={1.5} /> },
-    { to: '/library', label: '公共皮肤库', icon: <Store size={17} strokeWidth={1.5} /> },
-    { to: '/records', label: '登录记录', icon: <History size={17} strokeWidth={1.5} /> },
+    { to: '/', label: t('nav.dashboard'), icon: <LayoutDashboard size={17} strokeWidth={1.5} />, end: true },
+    { to: '/wardrobe', label: t('nav.wardrobe'), icon: <Palette size={17} strokeWidth={1.5} /> },
+    { to: '/library', label: t('nav.library'), icon: <Store size={17} strokeWidth={1.5} /> },
+    { to: '/records', label: t('nav.records'), icon: <History size={17} strokeWidth={1.5} /> },
   ]
 
   return (
@@ -53,14 +56,15 @@ export default function MainLayout() {
         </Link>
         <span className="site-name">{siteName}</span>
         <span className="spacer" />
+        <LanguageSwitcher />
         <div className="user">
-          {isSuper ? <span className="badge">超级管理员</span> : isAdmin ? <span className="badge">管理员</span> : null}
+          {isSuper ? <span className="badge">{t('layout.badgeSuper')}</span> : isAdmin ? <span className="badge">{t('layout.badgeAdmin')}</span> : null}
           {user.avatar_url ? (
             <img
               src={assetUrl(user.avatar_url)}
-              alt="头像"
+              alt={t('layout.avatarAlt')}
               onClick={() => navigate('/settings')}
-              title="个人设置"
+              title={t('layout.settingsTitle')}
               style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid var(--line)', imageRendering: 'pixelated', cursor: 'pointer' }}
             />
           ) : null}
@@ -68,9 +72,9 @@ export default function MainLayout() {
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => navigate('/settings')}
-            title="个人设置"
+            title={t('layout.settingsTitle')}
           >
-            设置
+            {t('layout.settings')}
           </button>
           <button
             className="btn btn-ghost btn-sm"
@@ -80,14 +84,14 @@ export default function MainLayout() {
             }}
           >
             <LogOut size={15} strokeWidth={1.5} />
-            退出
+            {t('layout.logout')}
           </button>
         </div>
       </header>
 
       <div className="app-body">
         <aside className="sidebar">
-          <span className="side-label">导航</span>
+          <span className="side-label">{t('layout.sidebarNav')}</span>
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => (isActive ? 'active' : '')}>
               {item.icon}
@@ -96,17 +100,17 @@ export default function MainLayout() {
           ))}
           {canManage && (
             <>
-              <span className="side-label">管理</span>
+              <span className="side-label">{t('layout.sidebarManage')}</span>
               {(isAdmin || perms.includes('user_manage') || perms.includes('texture_library')) && (
                 <NavLink to="/admin" className={({ isActive }) => (isActive ? 'active' : '')}>
                   <Shield size={17} strokeWidth={1.5} />
-                  管理
+                  {t('nav.admin')}
                 </NavLink>
               )}
               {isAdmin && (
                 <NavLink to="/admin/records" className={({ isActive }) => (isActive ? 'active' : '')}>
                   <History size={17} strokeWidth={1.5} />
-                  全部登录记录
+                  {t('nav.allRecords')}
                 </NavLink>
               )}
             </>
@@ -119,3 +123,4 @@ export default function MainLayout() {
     </div>
   )
 }
+

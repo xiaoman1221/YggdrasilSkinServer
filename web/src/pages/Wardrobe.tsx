@@ -66,6 +66,8 @@ export default function Wardrobe() {
   const { refreshUser } = useAuth()
   const toast = useToast()
   const [textures, setTextures] = useState<Texture[]>([])
+  const skins = textures.filter((t) => t.type === 'skin')
+  const capes = textures.filter((t) => t.type === 'cape')
   const [loading, setLoading] = useState(true)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadType, setUploadType] = useState<'skin' | 'cape'>('skin')
@@ -76,6 +78,7 @@ export default function Wardrobe() {
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [pickerFor, setPickerFor] = useState<Texture | null>(null)
+  const [capePickerFor, setCapePickerFor] = useState<Texture | null>(null)
   const [editTexFor, setEditTexFor] = useState<Texture | null>(null)
   const [editTexForm, setEditTexForm] = useState({ name: '', description: '' })
   const [editTexBusy, setEditTexBusy] = useState(false)
@@ -214,6 +217,17 @@ export default function Wardrobe() {
       await profileApi.bindTexture(profile.uuid, 'skin', t.id)
       toast.show(`已应用到 ${profile.name}`, 'ok')
       setPickerFor(null)
+      load()
+    } catch (err: any) {
+      toast.show(err?.response?.data?.error?.message || err.message || '应用失败', 'err')
+    }
+  }
+
+  async function setAsCape(t: Texture, profile: Profile) {
+    try {
+      await profileApi.bindTexture(profile.uuid, 'cape', t.id)
+      toast.show(`已应用到 ${profile.name}`, 'ok')
+      setCapePickerFor(null)
       load()
     } catch (err: any) {
       toast.show(err?.response?.data?.error?.message || err.message || '应用失败', 'err')
@@ -398,66 +412,110 @@ export default function Wardrobe() {
       </header>
 
       {loading ? (
-        <Spinner label="加载材质" />
+        <Spinner label="加载皮肤" />
       ) : textures.length === 0 ? (
-        <div className="empty">仓库为空，点击右上角「上传材质」添加第一份</div>
+        <div className="empty">仓库为空，点击右上角「上传皮肤」添加第一份</div>
       ) : (
-        <div className="grid">
-          {textures.map((t) => (
-            <PreviewCard
-              key={t.id}
-              skinUrl={t.type === 'skin' ? textureUrl(t.hash) : undefined}
-              capeUrl={t.type === 'cape' ? textureUrl(t.hash) : undefined}
-              slim={t.model === 'slim'}
-              title={
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <StatusTag kind={t.type === 'skin' ? 'on' : 'warn'}>{t.type === 'skin' ? '皮肤' : '披风'}</StatusTag>
-                  {t.name ? <span className="mono">{t.name}</span> : null}
-                  {t.library_item?.status === 'pending' ? <StatusTag kind="warn">待审核</StatusTag> : null}
-                  {t.library_item?.status === 'approved' ? <StatusTag kind="on">已入库</StatusTag> : null}
-                  {t.library_item?.status === 'rejected' ? <StatusTag kind="warn">已驳回</StatusTag> : null}
-                </span>
-              }
-              meta={`${t.model} · ${t.width}×${t.height} · ${t.hash.slice(0, 12)}…${t.description ? ' · ' + t.description : ''}`}
-              actions={
-                <>
-                  {t.type === 'skin' ? (
-                    <>
-                      <TextLink onClick={() => setPickerFor(t)}>
-                        <ImagePlus size="1em" strokeWidth={1.5} />
-                        <span className="lnk-txt">设为皮肤</span>
-                      </TextLink>
-                      <TextLink onClick={() => setAsAvatar(t)}>
-                        <UserRound size="1em" strokeWidth={1.5} />
-                        <span className="lnk-txt">设为头像</span>
-                      </TextLink>
-                    </>
-                  ) : null}
-                  {t.type === 'skin' && !t.library_item ? (
-                    <TextLink onClick={() => setLibFor(t)}>
-                      <Store size="1em" strokeWidth={1.5} />
-                      <span className="lnk-txt">申请入库</span>
-                    </TextLink>
-                  ) : null}
-                  {t.type === 'skin' && (t.library_item?.status === 'pending' || t.library_item?.status === 'rejected') ? (
-                    <TextLink onClick={() => withdrawSkinSubmission(t)}>
-                      <XCircle size="1em" strokeWidth={1.5} />
-                      <span className="lnk-txt">撤回申请</span>
-                    </TextLink>
-                  ) : null}
-                  <TextLink onClick={() => openTexEdit(t)}>
-                    <Pencil size="1em" strokeWidth={1.5} />
-                    <span className="lnk-txt">信息</span>
-                  </TextLink>
-                  <TextLink danger onClick={() => removeTexture(t)}>
-                    <Trash2 size="1em" strokeWidth={1.5} />
-                    <span className="lnk-txt">删除</span>
-                  </TextLink>
-                </>
-              }
-            />
-          ))}
-        </div>
+        <>
+          {skins.length > 0 && (
+            <section style={{ marginBottom: 40 }}>
+              <div className="sec-head">
+                <h2 className="page-title" style={{ fontSize: 20 }}>
+                  皮肤 <span className="mono sec-count">{skins.length}</span>
+                </h2>
+              </div>
+              <div className="grid">
+                {skins.map((t) => (
+                  <PreviewCard
+                    key={t.id}
+                    skinUrl={textureUrl(t.hash)}
+                    slim={t.model === 'slim'}
+                    title={
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        {t.name ? <span className="mono">{t.name}</span> : null}
+                        {t.library_item?.status === 'pending' ? <StatusTag kind="warn">待审核</StatusTag> : null}
+                        {t.library_item?.status === 'approved' ? <StatusTag kind="on">已入库</StatusTag> : null}
+                        {t.library_item?.status === 'rejected' ? <StatusTag kind="warn">已驳回</StatusTag> : null}
+                      </span>
+                    }
+                    meta={`${t.model} · ${t.width}×${t.height} · ${t.hash.slice(0, 12)}…${t.description ? ' · ' + t.description : ''}`}
+                    actions={
+                      <>
+                        <TextLink onClick={() => setPickerFor(t)}>
+                          <ImagePlus size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">设为皮肤</span>
+                        </TextLink>
+                        <TextLink onClick={() => setAsAvatar(t)}>
+                          <UserRound size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">设为头像</span>
+                        </TextLink>
+                        {!t.library_item ? (
+                          <TextLink onClick={() => setLibFor(t)}>
+                            <Store size="1em" strokeWidth={1.5} />
+                            <span className="lnk-txt">申请入库</span>
+                          </TextLink>
+                        ) : null}
+                        {t.library_item?.status === 'pending' || t.library_item?.status === 'rejected' ? (
+                          <TextLink onClick={() => withdrawSkinSubmission(t)}>
+                            <XCircle size="1em" strokeWidth={1.5} />
+                            <span className="lnk-txt">撤回申请</span>
+                          </TextLink>
+                        ) : null}
+                        <TextLink onClick={() => openTexEdit(t)}>
+                          <Pencil size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">信息</span>
+                        </TextLink>
+                        <TextLink danger onClick={() => removeTexture(t)}>
+                          <Trash2 size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">删除</span>
+                        </TextLink>
+                      </>
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+          {capes.length > 0 && (
+            <section style={{ marginBottom: 40 }}>
+              <div className="sec-head">
+                <h2 className="page-title" style={{ fontSize: 20 }}>
+                  披风 <span className="mono sec-count">{capes.length}</span>
+                </h2>
+              </div>
+              <div className="grid">
+                {capes.map((t) => (
+                  <PreviewCard
+                    key={t.id}
+                    capeUrl={textureUrl(t.hash)}
+                    title={
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        {t.name ? <span className="mono">{t.name}</span> : null}
+                      </span>
+                    }
+                    meta={`${t.width}×${t.height} · ${t.hash.slice(0, 12)}…${t.description ? ' · ' + t.description : ''}`}
+                    actions={
+                      <>
+                        <TextLink onClick={() => setCapePickerFor(t)}>
+                          <ImagePlus size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">设为披风</span>
+                        </TextLink>
+                        <TextLink onClick={() => openTexEdit(t)}>
+                          <Pencil size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">信息</span>
+                        </TextLink>
+                        <TextLink danger onClick={() => removeTexture(t)}>
+                          <Trash2 size="1em" strokeWidth={1.5} />
+                          <span className="lnk-txt">删除</span>
+                        </TextLink>
+                      </>
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       <div

@@ -244,6 +244,7 @@ func (s *YggdrasilService) Authenticate(req *AuthenticateRequest, ip, userAgent 
 	if err != nil || !util.CheckPassword(user.PasswordHash, req.Password) {
 		return yggdrasilError(http.StatusForbidden, "ForbiddenOperationException", "Invalid credentials. Invalid username or password.")
 	}
+	s.ensureYggdrasilUUID(&user)
 
 	profiles, err := s.userProfiles(user.ID)
 	if err != nil {
@@ -285,6 +286,7 @@ func (s *YggdrasilService) Refresh(req *RefreshRequest) (int, gin.H) {
 	if err := s.db.First(&user, token.UserID).Error; err != nil {
 		return yggdrasilError(http.StatusForbidden, "ForbiddenOperationException", "Invalid token.")
 	}
+	s.ensureYggdrasilUUID(&user)
 
 	profiles, err := s.userProfiles(user.ID)
 	if err != nil {
@@ -560,6 +562,16 @@ func (s *YggdrasilService) TexturePathByHash(hash string) (string, error) {
 
 // --- 内部辅助 ---
 
+// ensureYggdrasilUUID 确保站点账号已有稳定的 Yggdrasil 用户 UUID。
+// 历史账号可能在字段引入前注册，首次登录时补齐并持久化。
+func (s *YggdrasilService) ensureYggdrasilUUID(user *model.User) {
+	if user.YggdrasilUUID != "" {
+		return
+	}
+	user.YggdrasilUUID = util.NewUUID()
+	s.db.Model(user).Update("yggdrasil_uuid", user.YggdrasilUUID)
+}
+
 func (s *YggdrasilService) userProfiles(userID uint) ([]model.Profile, error) {
 	var profiles []model.Profile
 	err := s.db.Where("user_id = ?", userID).Find(&profiles).Error
@@ -630,8 +642,14 @@ func (s *YggdrasilService) authResponse(token *model.Token, clientToken string, 
 		resp["selectedProfile"] = GameProfile{ID: util.NormalizeUUID(selected.UUID), Name: selected.Name}
 	}
 	if requestUser && user != nil {
+		// 站点账号在 Yggdrasil 协议中的稳定用户 ID（区别于各 Minecraft 档案 UUID）。
+		// 新账号在创建时生成并持久化；历史账号无该字段时采用一次性兜底（不应在协议响应中暴露随机值）。
+		userID := user.YggdrasilUUID
+		if userID == "" {
+			userID = util.NewUUID()
+		}
 		resp["user"] = gin.H{
-			"id":         util.NormalizeUUID(util.NewUUID()), // TODO: 用户 UUID 与档案 UUID 分离
+			"id":         util.NormalizeUUID(userID),
 			"properties": []any{},
 		}
 	}

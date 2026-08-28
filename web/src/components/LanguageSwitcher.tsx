@@ -50,11 +50,6 @@ export default function LanguageSwitcher({ variant = 'topbar' }: { variant?: 'to
             top: 'calc(100% + 6px)',
             zIndex: 100,
             minWidth: 172,
-            background: 'var(--bg2, #fff)',
-            border: '1px solid var(--line)',
-            borderRadius: 8,
-            padding: 4,
-            boxShadow: '0 8px 24px rgba(0,0,0,.18)',
             display: 'flex',
             flexDirection: 'column',
           }}
@@ -69,22 +64,7 @@ export default function LanguageSwitcher({ variant = 'topbar' }: { variant?: 'to
                   setLang(code)
                   setOpen(false)
                 }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '7px 10px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  borderRadius: 6,
-                  fontSize: 13,
-                  textAlign: 'left',
-                  color: 'var(--text, inherit)',
-                  fontWeight: active ? 600 : 400,
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--line, #eee)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                className={`lang-dropdown-option${active ? ' active' : ''}`}
               >
                 {SUPPORTED_LANGS[code].native}
                 {active ? (

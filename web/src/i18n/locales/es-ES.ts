@@ -104,6 +104,7 @@ export default {
   },
   preview: {
     emptySkin: 'Sin skin configurada',
+    alt: 'Vista previa de skin', ariaLabel: 'Vista previa interactiva de skin en 3D',
   },
   picker: {
     title: 'Seleccionar perfil',
@@ -482,6 +483,7 @@ export default {
       title: 'Idioma de la interfaz',
       hint: 'Cambia el idioma de la interfaz del sitio. Tu selección se recordará.',
     },
+    theme: { title: 'Tema', hint: 'Elige claro, oscuro o la configuración del sistema. Se recordará tu preferencia.', light: 'Claro', dark: 'Oscuro', auto: 'Sistema' },
   },
   library: {
     pageTitle: 'Biblioteca pública de skins',

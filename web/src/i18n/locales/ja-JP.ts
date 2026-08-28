@@ -104,6 +104,7 @@ export default {
   },
   preview: {
     emptySkin: 'スキンが設定されていません',
+    alt: 'スキンプレビュー', ariaLabel: '操作可能な 3D スキンプレビュー',
   },
   picker: {
     title: 'プロフィール選択',
@@ -482,6 +483,7 @@ export default {
       title: 'インターフェース言語',
       hint: 'サイトの表示言語を変更します。選択は記憶されます。',
     },
+    theme: { title: 'テーマ', hint: 'ライト、ダーク、またはシステム設定を選択します。選択は保存されます。', light: 'ライト', dark: 'ダーク', auto: 'システム' },
   },
   library: {
     pageTitle: '公共スキンライブラリ',

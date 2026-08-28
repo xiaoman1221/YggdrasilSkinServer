@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, KeyRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../stores/auth'
 import { authApi, OAuthProvider } from '../api/auth'
 import { captchaApi } from '../api/captcha'
@@ -11,6 +12,7 @@ import { useToast } from '../components/Toast'
 import { getPasskey } from '../lib/webauthn'
 
 export default function Login() {
+  const { t } = useTranslation()
   const { login, refreshUser } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
@@ -56,13 +58,13 @@ export default function Login() {
       const res = await authApi.oauthAuthorize(type)
       window.location.href = res.url
     } catch (err: any) {
-      toast.show(err?.message || '获取授权地址失败', 'err')
+      toast.show(err?.message || t('login.toast.oauthUrlFailed'), 'err')
     }
   }
 
   async function passkeyLogin() {
     if (!account.trim()) {
-      toast.show('请先输入邮箱或用户名', 'err')
+      toast.show(t('login.toast.accountRequired'), 'err')
       return
     }
     setBusy(true)
@@ -72,11 +74,11 @@ export default function Login() {
       const res = await authApi.passkeyLoginFinish(sessionId, response)
       localStorage.setItem('yss_access_token', res.accessToken)
       localStorage.setItem('yss_refresh_token', res.refreshToken)
-      toast.show('登录成功', 'ok')
+      toast.show(t('login.toast.loginSuccess'), 'ok')
       await refreshUser()
       navigate('/', { replace: true })
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '通行密钥登录失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('login.toast.passkeyFailed'), 'err')
     } finally {
       setBusy(false)
     }
@@ -85,11 +87,11 @@ export default function Login() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!account || !password) {
-      toast.show('请输入账号与密码', 'err')
+      toast.show(t('login.toast.credentialsRequired'), 'err')
       return
     }
     if (captchaRequired && (!captcha.id || !captcha.code.trim())) {
-      toast.show('请输入图形验证码', 'err')
+      toast.show(t('login.toast.captchaRequired'), 'err')
       return
     }
     setBusy(true)
@@ -98,14 +100,14 @@ export default function Login() {
         captchaId: captchaRequired ? captcha.id : undefined,
         captchaCode: captchaRequired ? captcha.code.trim() : undefined,
       })
-      toast.show('登录成功', 'ok')
+      toast.show(t('login.toast.loginSuccess'), 'ok')
       navigate('/', { replace: true })
     } catch (err: any) {
       if (err?.response?.data?.error?.details?.captcha) {
         setCaptchaRequired(true)
         refreshCaptcha()
       }
-      toast.show(err?.response?.data?.error?.message || err.message || '登录失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('login.toast.loginFailed'), 'err')
     } finally {
       setBusy(false)
     }
@@ -116,9 +118,9 @@ export default function Login() {
       <AuthAside
         tagline={
           <>
-            自托管 Minecraft 皮肤站与 Yggdrasil 认证服务器。
+            {t('login.tagline1')}
             <br />
-            天上如是，地下亦然。
+            {t('login.tagline2')}
           </>
         }
       />
@@ -126,11 +128,11 @@ export default function Login() {
       <main className="auth-main">
         <form className="auth-form" onSubmit={onSubmit}>
           <div>
-            <h1>登录</h1>
-            <p className="hint">使用邮箱或用户名</p>
+            <h1>{t('login.title')}</h1>
+            <p className="hint">{t('login.hint')}</p>
           </div>
           <div className="fields">
-            <Field label="邮箱或用户名">
+            <Field label={t('login.field.account')}>
               <Input
                 value={account}
                 onChange={(e) => setAccount(e.target.value)}
@@ -139,7 +141,7 @@ export default function Login() {
                 autoFocus
               />
             </Field>
-            <Field label="密码">
+            <Field label={t('login.field.password')}>
               <Input
                 type="password"
                 value={password}
@@ -152,16 +154,16 @@ export default function Login() {
               <CaptchaField value={captcha} onChange={setCaptcha} onRefresh={refreshCaptcha} />
             ) : null}
             <Button type="submit" variant="primary" size="lg" disabled={busy}>
-              登录
+              {t('login.btn.login')}
               <ArrowRight size={16} strokeWidth={1.5} />
             </Button>
             <Button type="button" size="lg" disabled={busy} onClick={passkeyLogin}>
               <KeyRound size={16} strokeWidth={1.5} />
-              使用通行密钥登录
+              {t('login.btn.passkey')}
             </Button>
             {oauth.length > 0 ? (
               <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
-                <span className="field-label">第三方登录</span>
+                <span className="field-label">{t('login.oauthLabel')}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {oauth.map((p) => (
                     <Button key={p.name} size="sm" onClick={() => oauthLogin(p.name)}>
@@ -173,8 +175,8 @@ export default function Login() {
             ) : null}
           </div>
           <p className="auth-switch" style={{ display: 'flex', justifyContent: 'center', gap: 24 }}>
-            <Link to="/register">注册</Link>
-            <Link to="/forgot-password">忘记密码</Link>
+            <Link to="/register">{t('login.link.register')}</Link>
+            <Link to="/forgot-password">{t('login.link.forgotPassword')}</Link>
           </p>
         </form>
       </main>

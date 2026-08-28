@@ -104,6 +104,7 @@ export default {
   },
   preview: {
     emptySkin: 'Aucun skin défini',
+    alt: 'Aperçu du skin', ariaLabel: 'Aperçu 3D interactif du skin',
   },
   picker: {
     title: 'Choisir un profil',
@@ -482,6 +483,7 @@ export default {
       title: 'Langue de l\'interface',
       hint: 'Changez la langue du site. Votre choix sera mémorisé.',
     },
+    theme: { title: 'Thème', hint: 'Choisissez clair, sombre ou le réglage système. Votre préférence sera mémorisée.', light: 'Clair', dark: 'Sombre', auto: 'Système' },
   },
   library: {
     pageTitle: 'Bibliothèque publique',

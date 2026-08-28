@@ -104,6 +104,7 @@ export default {
   },
   preview: {
     emptySkin: 'Nenhuma pele definida',
+    alt: 'Pré-visualização da pele', ariaLabel: 'Pré-visualização 3D interativa da pele',
   },
   picker: {
     title: 'Selecionar perfil',
@@ -482,6 +483,7 @@ export default {
       title: 'Idioma da interface',
       hint: 'Alterar o idioma da interface. Sua preferência será salva.',
     },
+    theme: { title: 'Tema', hint: 'Escolha claro, escuro ou a configuração do sistema. Sua preferência será lembrada.', light: 'Claro', dark: 'Escuro', auto: 'Sistema' },
   },
   library: {
     pageTitle: 'Biblioteca pública de peles',

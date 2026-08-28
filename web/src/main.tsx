@@ -10,6 +10,9 @@ import '@fontsource/ibm-plex-mono/700.css'
 import App from './App'
 import './index.css'
 import './i18n'
+import { initTheme } from './lib/theme'
+
+initTheme()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

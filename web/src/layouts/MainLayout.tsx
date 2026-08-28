@@ -6,6 +6,7 @@ import { useAuth } from '../stores/auth'
 import { siteApi } from '../api/site'
 import { Spinner } from '../components/ui'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import { assetUrl } from '../utils/format'
 
 export default function MainLayout() {
@@ -57,6 +58,7 @@ export default function MainLayout() {
         <span className="site-name">{siteName}</span>
         <span className="spacer" />
         <LanguageSwitcher />
+        <ThemeSwitcher compact />
         <div className="user">
           {isSuper ? <span className="badge">{t('layout.badgeSuper')}</span> : isAdmin ? <span className="badge">{t('layout.badgeAdmin')}</span> : null}
           {user.avatar_url ? (
@@ -123,4 +125,3 @@ export default function MainLayout() {
     </div>
   )
 }
-

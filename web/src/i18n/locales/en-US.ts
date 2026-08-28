@@ -104,6 +104,7 @@ export default {
   },
   preview: {
     emptySkin: 'No skin set',
+    alt: 'Skin preview', ariaLabel: 'Interactive 3D skin preview',
   },
   picker: {
     title: 'Select Profile',
@@ -482,6 +483,7 @@ export default {
       title: 'Interface Language',
       hint: 'Switch the site language. Your preference will be remembered.',
     },
+    theme: { title: 'Theme', hint: 'Choose light, dark, or follow system. Your preference will be remembered.', light: 'Light', dark: 'Dark', auto: 'System' },
   },
   library: {
     pageTitle: 'Public Skin Library',

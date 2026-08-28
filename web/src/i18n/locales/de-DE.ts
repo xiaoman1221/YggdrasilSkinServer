@@ -104,6 +104,7 @@ export default {
   },
   preview: {
     emptySkin: 'Kein Skin gesetzt',
+    alt: 'Skin-Vorschau', ariaLabel: 'Interaktive 3D-Skin-Vorschau',
   },
   picker: {
     title: 'Profil auswählen',
@@ -482,6 +483,7 @@ export default {
       title: 'Oberflächensprache',
       hint: 'Wechsle die Sprache der Benutzeroberfläche. Deine Auswahl wird gespeichert.',
     },
+    theme: { title: 'Design', hint: 'Wähle hell, dunkel oder die Systemeinstellung. Deine Auswahl wird gespeichert.', light: 'Hell', dark: 'Dunkel', auto: 'System' },
   },
   library: {
     pageTitle: 'Öffentliche Skin-Bibliothek',

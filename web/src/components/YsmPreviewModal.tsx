@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import { Box } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Modal, Spinner } from './ui'
 import YsmModelViewer, { type YsmModelData } from './YsmViewer3D'
 import { buildBoneBindMap, extractGeometries, pickMainGeometry } from '../lib/bedrock'
@@ -20,7 +21,7 @@ interface YsmPreviewModalProps {
 
 type LoadState =
   | { phase: 'loading'; progress: number }
-  | { phase: 'error'; message: string }
+  | { phase: 'error'; message?: string; code?: 'no_geometry' | 'no_textures' }
   | { phase: 'ready'; data: YsmModelData; debug?: string; textureUrls: string[] }
 
 /** 解密并解析模型，产出查看器所需的 modelData。 */
@@ -34,12 +35,12 @@ async function prepare(target: YsmPreviewTarget, onProgress: (p: number) => void
   const entries = extractGeometries(jsonFiles)
   const main = pickMainGeometry(entries)
   if (!main) {
-    return { phase: 'error', message: '未找到模型几何数据（minecraft:geometry），该模型可能不受支持' }
+    return { phase: 'error', code: 'no_geometry' }
   }
 
   const textures = buildTextureOptions(files)
   if (textures.length === 0) {
-    return { phase: 'error', message: '模型中没有贴图文件，无法渲染' }
+    return { phase: 'error', code: 'no_textures' }
   }
   // 绑定姿态表：让动画关键帧叠加主模型骨骼的绑定位置/旋转
   const clips = buildClipsFromFiles(files, buildBoneBindMap(main.geometry))
@@ -69,6 +70,7 @@ async function prepare(target: YsmPreviewTarget, onProgress: (p: number) => void
  * 渲染由 R3F 查看器完成（动画切换 / 贴图切换 / 截图 / 全屏）。
  */
 export default function YsmPreviewModal({ open, target, onClose }: YsmPreviewModalProps) {
+  const { t } = useTranslation()
   const [state, setState] = useState<LoadState>({ phase: 'loading', progress: 0 })
   const [currentAnimation, setCurrentAnimation] = useState('')
   const [nonce, setNonce] = useState(0)
@@ -109,13 +111,22 @@ export default function YsmPreviewModal({ open, target, onClose }: YsmPreviewMod
     setNonce((n) => n + 1)
   }
 
+  const errorMessage =
+    state.phase === 'error' && state.code
+      ? state.code === 'no_geometry'
+        ? t('ysm.modal.errorNoGeometry')
+        : t('ysm.modal.errorNoTextures')
+      : state.phase === 'error'
+        ? state.message
+        : undefined
+
   return (
     <Modal
       open={open}
       title={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <Box size={16} strokeWidth={1.5} />
-          模型预览 · <span className="mono">{target?.name}</span>
+          {t('ysm.modal.title')}<span className="mono">{target?.name}</span>
         </span>
       }
       onClose={onClose}
@@ -124,25 +135,31 @@ export default function YsmPreviewModal({ open, target, onClose }: YsmPreviewMod
         <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', width: '100%' }}>
           {state.phase === 'error' ? (
             <button className="btn btn-outline" onClick={retry}>
-              重试
+              {t('ysm.retry')}
             </button>
           ) : (
             <span />
           )}
           <button className="btn btn-ghost" onClick={onClose}>
-            关闭
+            {t('ysm.close')}
           </button>
         </div>
       }
     >
       {state.phase === 'loading' && (
         <div style={{ display: 'grid', placeItems: 'center', padding: '60px 0' }}>
-          <Spinner label={target?.format === 'ysm' ? `正在解密模型… ${state.progress}%` : '正在加载模型…'} />
+          <Spinner
+            label={
+              target?.format === 'ysm'
+                ? t('ysm.modal.loadingDecrypt', { progress: state.progress })
+                : t('ysm.modal.loadingLoad')
+            }
+          />
         </div>
       )}
       {state.phase === 'error' && (
         <div className="empty" style={{ color: 'var(--danger)' }}>
-          {state.message}
+          {errorMessage}
         </div>
       )}
       {state.phase === 'ready' && (
@@ -156,7 +173,7 @@ export default function YsmPreviewModal({ open, target, onClose }: YsmPreviewMod
           {state.debug ? (
             <details style={{ marginTop: 10 }}>
               <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-3)' }}>
-                调试信息（反馈问题时请展开复制）
+                {t('ysm.modal.debugSummary')}
               </summary>
               <pre
                 className="mono"

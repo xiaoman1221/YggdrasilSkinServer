@@ -8,11 +8,13 @@ import { Button, Field, Input } from '../components/ui'
 import AuthAside from '../components/AuthAside'
 import CaptchaField, { CaptchaValue } from '../components/CaptchaField'
 import { useToast } from '../components/Toast'
+import { useTranslation } from 'react-i18next'
 
 export default function Register() {
   const { register } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -54,26 +56,26 @@ export default function Register() {
       const res = await authApi.oauthAuthorize(type)
       window.location.href = res.url
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '获取授权地址失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('register.toast.oauthUrlFailed'), 'err')
     }
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!/^[A-Za-z0-9_]{3,16}$/.test(username)) {
-      toast.show('用户名需为 3-16 位字母数字下划线', 'err')
+      toast.show(t('register.toast.usernameInvalid'), 'err')
       return
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.show('请输入有效邮箱', 'err')
+      toast.show(t('register.toast.emailInvalid'), 'err')
       return
     }
     if (password.length < 6) {
-      toast.show('密码至少 6 位', 'err')
+      toast.show(t('register.toast.passwordTooShort'), 'err')
       return
     }
     if (captchaRequired && (!captcha.id || !captcha.code.trim())) {
-      toast.show('请输入图形验证码', 'err')
+      toast.show(t('register.toast.captchaRequired'), 'err')
       return
     }
     setBusy(true)
@@ -82,13 +84,13 @@ export default function Register() {
         captchaId: captchaRequired ? captcha.id : undefined,
         captchaCode: captchaRequired ? captcha.code.trim() : undefined,
       })
-      toast.show('注册成功，请登录', 'ok')
+      toast.show(t('register.toast.registerSuccess'), 'ok')
       navigate('/login', { replace: true })
     } catch (err: any) {
       if (err?.response?.data?.error?.details?.captcha) {
         refreshCaptcha()
       }
-      toast.show(err?.response?.data?.error?.message || err.message || '注册失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('register.toast.registerFailed'), 'err')
     } finally {
       setBusy(false)
     }
@@ -96,16 +98,16 @@ export default function Register() {
 
   return (
     <div className="split-auth">
-      <AuthAside tagline="创建一个站点账号，开始管理你的 Minecraft 档案与皮肤。" />
+      <AuthAside tagline={t('register.tagline')} />
 
       <main className="auth-main">
         <form className="auth-form" onSubmit={onSubmit}>
           <div>
-            <h1>注册</h1>
-            <p className="hint">创建站点账号</p>
+            <h1>{t('register.title')}</h1>
+            <p className="hint">{t('register.hint')}</p>
           </div>
           <div className="fields">
-            <Field label="用户名">
+            <Field label={t('register.field.username')}>
               <Input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -114,7 +116,7 @@ export default function Register() {
                 autoFocus
               />
             </Field>
-            <Field label="邮箱">
+            <Field label={t('register.field.email')}>
               <Input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -122,7 +124,7 @@ export default function Register() {
                 autoComplete="email"
               />
             </Field>
-            <Field label="密码" hint="至少 6 位">
+            <Field label={t('register.field.password')} hint={t('register.field.passwordHint')}>
               <Input
                 type="password"
                 value={password}
@@ -135,12 +137,12 @@ export default function Register() {
               <CaptchaField value={captcha} onChange={setCaptcha} onRefresh={refreshCaptcha} />
             ) : null}
             <Button type="submit" variant="primary" size="lg" disabled={busy}>
-              注册
+              {t('register.btn.register')}
               <ArrowRight size={16} strokeWidth={1.5} />
             </Button>
             {oauth.length > 0 ? (
               <div style={{ display: 'grid', gap: 8, marginTop: 4 }}>
-                <span className="field-label">第三方快捷登录</span>
+                <span className="field-label">{t('register.oauthLabel')}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {oauth.map((p) => (
                     <Button key={p.name} size="sm" onClick={() => oauthLogin(p.name)}>
@@ -152,7 +154,7 @@ export default function Register() {
             ) : null}
           </div>
           <p className="auth-switch">
-            已有账号？<Link to="/login">登录</Link>
+            {t('register.switch.hasAccount')}<Link to="/login">{t('register.switch.login')}</Link>
           </p>
         </form>
       </main>

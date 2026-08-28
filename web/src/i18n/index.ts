@@ -26,6 +26,28 @@ export type LangCode = keyof typeof SUPPORTED_LANGS
 
 const STORAGE_KEY = 'yss_lang'
 
+// 浏览器语言到本站支持语言的映射（取前缀匹配）
+function browserLang(): LangCode {
+  if (typeof navigator === 'undefined') return 'zh-CN'
+  const langs = navigator.languages?.length ? navigator.languages : [navigator.language]
+  for (const raw of langs) {
+    const l = (raw || '').toLowerCase()
+    for (const code of Object.keys(SUPPORTED_LANGS) as LangCode[]) {
+      if (l.startsWith(code.toLowerCase())) return code
+    }
+    const base = l.split('-')[0]
+    let match: LangCode | null = null
+    for (const code of Object.keys(SUPPORTED_LANGS) as LangCode[]) {
+      if (code.toLowerCase().startsWith(base)) {
+        match = code
+        break
+      }
+    }
+    if (match) return match
+  }
+  return 'zh-CN'
+}
+
 export function getStoredLang(): LangCode {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -33,7 +55,7 @@ export function getStoredLang(): LangCode {
   } catch {
     /* ignore */
   }
-  return 'zh-CN'
+  return browserLang()
 }
 
 export function persistLang(code: LangCode) {

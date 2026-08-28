@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, useProgress } from '@react-three/drei'
+import { useTranslation } from 'react-i18next'
 import { buildModel, type GeometryEntry } from '../lib/bedrock'
 
 /* ================= 数据接口 ================= */
@@ -201,10 +202,23 @@ export default function YsmModelViewer({
   onAnimationChange,
   height = 460,
 }: YsmModelViewerProps) {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const screenshotRef = useRef<(() => string) | null>(null)
   const [textureIndex, setTextureIndex] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
+  // 场景背景色：跟随主题（从 CSS 变量读取）
+  const [bgColor, setBgColor] = useState('#eef0f3')
+
+  useEffect(() => {
+    const read = () => {
+      const c = getComputedStyle(document.documentElement).getPropertyValue('--bg-muted').trim()
+      setBgColor(c ? (c.startsWith('#') ? c : `#${c}`) : '#eef0f3')
+    }
+    read()
+    window.addEventListener('ts:themechange', read)
+    return () => window.removeEventListener('ts:themechange', read)
+  }, [])
 
   const textures = modelData?.textures ?? []
   const currentTexture = textures[textureIndex % Math.max(1, textures.length)]
@@ -278,7 +292,7 @@ export default function YsmModelViewer({
           gl={{ antialias: false, preserveDrawingBuffer: true }} // 像素风关闭抗锯齿；保留缓冲供截图
           camera={{ fov: 40, near: 0.01, far: maxDim * 20 + 100 }}
         >
-          <color attach="background" args={['#eef0f3']} />
+          <color attach="background" args={[bgColor]} />
           {/* 环境光 + 主光/补光双方向光，模拟游戏内光照 */}
           <ambientLight intensity={2.2} />
           <directionalLight
@@ -328,7 +342,7 @@ export default function YsmModelViewer({
             inset: 0,
             display: 'grid',
             placeItems: 'center',
-            background: 'rgba(255,255,255,0.65)',
+            background: 'var(--bg-muted)',
             pointerEvents: 'none',
           }}
         >
@@ -345,7 +359,7 @@ export default function YsmModelViewer({
               }}
             />
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-              {modelData ? `加载贴图 ${Math.round(progress)}%` : '正在解密模型…'}
+              {modelData ? t('ysm.viewer.loadingTexture', { progress: Math.round(progress) }) : t('ysm.viewer.decrypting')}
             </span>
           </div>
         </div>
@@ -361,7 +375,7 @@ export default function YsmModelViewer({
             display: 'flex',
             gap: 8,
             alignItems: 'center',
-            background: 'rgba(255,255,255,0.92)',
+            background: 'var(--bg-muted)',
             border: '1px solid var(--line, #ddd)',
             borderRadius: 8,
             padding: '8px 10px',
@@ -375,7 +389,7 @@ export default function YsmModelViewer({
             value={currentAnimation}
             onChange={(e) => onAnimationChange?.(e.target.value)}
           >
-            <option value="">绑定姿态</option>
+            <option value="">{t('ysm.viewer.bindPose')}</option>
             {modelData.clips.map((c) => (
               <option key={c.name} value={c.name}>
                 {c.name}
@@ -388,14 +402,14 @@ export default function YsmModelViewer({
               onClick={() => setTextureIndex((i) => (i + 1) % textures.length)}
               title={currentTexture?.name}
             >
-              切换贴图 ({(textureIndex % textures.length) + 1}/{textures.length})
+              {t('ysm.viewer.switchTexture', { index: (textureIndex % textures.length) + 1, total: textures.length })}
             </button>
           ) : null}
           <button className="btn btn-ghost btn-sm" onClick={handleScreenshot}>
-            截图
+            {t('ysm.viewer.screenshot')}
           </button>
           <button className="btn btn-ghost btn-sm" onClick={toggleFullscreen}>
-            {fullscreen ? '退出全屏' : '全屏'}
+            {fullscreen ? t('ysm.viewer.exitFullscreen') : t('ysm.viewer.fullscreen')}
           </button>
         </div>
       ) : null}

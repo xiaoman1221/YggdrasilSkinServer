@@ -5,6 +5,7 @@ import { siteApi } from '../api/site'
 import { authApi } from '../api/auth'
 import { useAuth } from '../stores/auth'
 import { useToast } from '../components/Toast'
+import { useTranslation } from 'react-i18next'
 import { Button, Field, Input, Modal, Panel, Spinner, StatusTag, TextLink } from '../components/ui'
 import { PreviewCard } from '../components/PreviewCard'
 import { assetUrl } from '../utils/format'
@@ -12,6 +13,7 @@ import { assetUrl } from '../utils/format'
 export default function Dashboard() {
   const { user } = useAuth()
   const toast = useToast()
+  const { t } = useTranslation()
   const apiUrl = `${window.location.origin}/api/yggdrasil`
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,7 +31,7 @@ export default function Dashboard() {
       const res = await profileApi.list()
       setProfiles(res.profiles)
     } catch (err: any) {
-      toast.show(err.message || '加载失败', 'err')
+      toast.show(err.message || t('dashboard.toast.loadFailed'), 'err')
     } finally {
       setLoading(false)
     }
@@ -42,18 +44,18 @@ export default function Dashboard() {
 
   async function createProfile() {
     if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) {
-      toast.show('名称需为 3-16 位字母数字下划线', 'err')
+      toast.show(t('dashboard.toast.nameInvalid'), 'err')
       return
     }
     setBusy(true)
     try {
       await profileApi.create(name)
-      toast.show('档案创建成功', 'ok')
+      toast.show(t('dashboard.toast.createSuccess'), 'ok')
       setCreateOpen(false)
       setName('')
       load()
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '创建失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('dashboard.toast.createFailed'), 'err')
     } finally {
       setBusy(false)
     }
@@ -62,31 +64,31 @@ export default function Dashboard() {
   async function renameProfile() {
     if (!renameTarget) return
     if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) {
-      toast.show('名称需为 3-16 位字母数字下划线', 'err')
+      toast.show(t('dashboard.toast.nameInvalid'), 'err')
       return
     }
     setBusy(true)
     try {
       await profileApi.rename(renameTarget.uuid, name)
-      toast.show('改名成功', 'ok')
+      toast.show(t('dashboard.toast.renameSuccess'), 'ok')
       setRenameTarget(null)
       setName('')
       load()
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '改名失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('dashboard.toast.renameFailed'), 'err')
     } finally {
       setBusy(false)
     }
   }
 
   async function deleteProfile(p: Profile) {
-    if (!window.confirm(`确认删除档案 ${p.name}？此操作不可撤销。`)) return
+    if (!window.confirm(t('dashboard.confirm.deleteProfile', { name: p.name }))) return
     try {
       await profileApi.remove(p.uuid)
-      toast.show('已删除', 'ok')
+      toast.show(t('dashboard.toast.deleted'), 'ok')
       load()
     } catch (err: any) {
-      toast.show(err.message || '删除失败', 'err')
+      toast.show(err.message || t('dashboard.toast.deleteFailed'), 'err')
     }
   }
 
@@ -94,66 +96,63 @@ export default function Dashboard() {
     <div>
       <header className="page-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <h1 className="page-title">控制台</h1>
+          <h1 className="page-title">{t('dashboard.title')}</h1>
           <p className="page-sub">
-            用户 <span className="mono">#{user?.id}</span> · {user?.email}
+            {t('dashboard.headerUser')} <span className="mono">#{user?.id}</span> · {user?.email}
           </p>
         </div>
         <Button variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus size={16} strokeWidth={1.5} />
-          新建档案
+          {t('dashboard.btnNewProfile')}
         </Button>
       </header>
 
       {announcement ? (
         <div className="announcement">
-          <span className="lbl">公告</span>
+          <span className="lbl">{t('dashboard.announcementLabel')}</span>
           <span>{announcement}</span>
         </div>
       ) : null}
 
       <div className="asym">
         <div className="stack">
-          <Panel title="账号">
+          <Panel title={t('dashboard.panel.account.title')}>
             <div className="panel-body">
               {user?.avatar_url ? (
                 <img
                   src={assetUrl(user.avatar_url)}
-                  alt="头像"
+                  alt={t('dashboard.panel.account.avatar')}
                   style={{ width: 64, height: 64, borderRadius: 8, border: "1px solid var(--line)", imageRendering: "pixelated", marginBottom: 12 }}
                 />
               ) : null}
               <dl className="kv">
-                <dt>用户名</dt>
+                <dt>{t('dashboard.panel.account.username')}</dt>
                 <dd>{user?.username}</dd>
-                <dt>邮箱</dt>
+                <dt>{t('dashboard.panel.account.email')}</dt>
                 <dd>{user?.email}</dd>
-                <dt>权限</dt>
+                <dt>{t('dashboard.panel.account.permissions')}</dt>
                 <dd>{user?.permissions}</dd>
                 <dt>UID</dt>
                 <dd>{user?.id}</dd>
-                <dt>正版账号</dt>
+                <dt>{t('dashboard.panel.account.premium')}</dt>
                 <dd>
-                  {user?.mojang_uuid ? `${user.mojang_name ?? '未知'} · ${user.mojang_uuid.slice(0, 8)}…` : '未绑定'}
+                  {user?.mojang_uuid ? `${user.mojang_name ?? t('common.unknown')} · ${user.mojang_uuid.slice(0, 8)}…` : t('dashboard.panel.account.notBound')}
                 </dd>
               </dl>
             </div>
           </Panel>
-          <Panel title="接入指南">
+          <Panel title={t('dashboard.panel.guide.title')}>
             <div className="panel-body">
               <p className="hint" style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-3)' }}>
-                本站支持 HMCL / PCL / BakaXL / MultiMC 等主流启动器（authlib-injector）。
+                {t('dashboard.panel.guide.intro')}
               </p>
               <dl className="kv">
-                <dt>第 1 步</dt>
-                <dd>在启动器「版本设置 → 认证服务器」启用 authlib-injector，或将下方按钮直接拖入启动器窗口自动识别</dd>
-                <dt>第 2 步</dt>
-                <dd>认证地址填写本站 API 地址（拖拽上方按钮或手动粘贴）</dd>
-                <dt>第 3 步</dt>
-                <dd>使用本站账号登录启动器</dd>
-                <dt>皮肤站</dt>
-                <dd>{siteName || 'YSS 皮肤站'}</dd>
-                <dt>API 地址</dt>
+                <dt>{t('dashboard.panel.guide.step1')}</dt><dd>{t('dashboard.panel.guide.step1Desc')}</dd>
+                <dt>{t('dashboard.panel.guide.step2')}</dt><dd>{t('dashboard.panel.guide.step2Desc')}</dd>
+                <dt>{t('dashboard.panel.guide.step3')}</dt><dd>{t('dashboard.panel.guide.step3Desc')}</dd>
+                <dt>{t('dashboard.panel.guide.skinSite')}</dt>
+                <dd>{siteName || 'YSS'}</dd>
+                <dt>{t('dashboard.panel.guide.apiUrl')}</dt>
                 <dd>
                   <span className="mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>
                     {apiUrl}
@@ -172,13 +171,13 @@ export default function Dashboard() {
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
                 >
-                  将此按钮拖动至启动器
+                  {t('dashboard.panel.guide.dragButton')}
                 </button>
                 <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
-                  手动接入：在启动器的认证服务器设置中粘贴上方 API 地址即可。
+                  {t('dashboard.panel.guide.manualHint')}
                 </p>
                 <p className="hint" style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
-                  在「个人皮肤」上传皮肤并应用到档案后，进服即可生效。
+                  {t('dashboard.panel.guide.skinHint')}
                 </p>
               </div>
             </div>
@@ -187,9 +186,9 @@ export default function Dashboard() {
 
         <div>
           {loading ? (
-            <Spinner label="加载档案" />
+            <Spinner label={t('dashboard.profiles.loading')} />
           ) : profiles.length === 0 ? (
-            <div className="empty">还没有档案，点击右上角「新建档案」创建第一个角色</div>
+            <div className="empty">{t('dashboard.profiles.empty')}</div>
           ) : (
             <div className="grid">
               {profiles.map((p) => {
@@ -205,9 +204,9 @@ export default function Dashboard() {
                       <>
                         <span className="mono">{p.name}</span>
                         <span style={{ display: 'inline-flex', gap: 6 }}>
-                          {premiumSynced ? <StatusTag kind="on">正版</StatusTag> : null}
-                          {p.skin_texture ? <StatusTag kind="on">皮肤</StatusTag> : null}
-                          {p.cape_texture ? <StatusTag kind="on">披风</StatusTag> : null}
+                          {premiumSynced ? <StatusTag kind="on">{t('dashboard.profile.tagPremium')}</StatusTag> : null}
+                          {p.skin_texture ? <StatusTag kind="on">{t('dashboard.profile.tagSkin')}</StatusTag> : null}
+                          {p.cape_texture ? <StatusTag kind="on">{t('dashboard.profile.tagCape')}</StatusTag> : null}
                           {p.ysm_model ? <StatusTag kind="warn">YSM</StatusTag> : null}
                         </span>
                       </>
@@ -226,12 +225,12 @@ export default function Dashboard() {
                                 const res = await authApi.mojangAuthorize(p.uuid)
                                 window.location.href = res.url
                               } catch (err: any) {
-                                toast.show(err?.response?.data?.error?.message || err.message || '获取授权地址失败', 'err')
+                                toast.show(err?.response?.data?.error?.message || err.message || t('dashboard.toast.oauthUrlFailed'), 'err')
                               }
                             }}
                           >
                             <BadgeCheck size={13} strokeWidth={1.5} />
-                            正版认证
+                            {t('dashboard.profile.actionPremiumVerify')}
                           </TextLink>
                         ) : null}
                         <TextLink
@@ -241,7 +240,7 @@ export default function Dashboard() {
                           }}
                         >
                           <Pencil size={13} strokeWidth={1.5} />
-                          改名
+                          {t('dashboard.profile.actionRename')}
                         </TextLink>
                       {p.ysm_model ? (
                         <>
@@ -249,21 +248,21 @@ export default function Dashboard() {
                             onClick={async () => {
                               try {
                                 await profileApi.unbindYsm(p.uuid)
-                                toast.show(`已解除 ${p.name} 的 YSM 模型`, 'ok')
+                                toast.show(t('dashboard.toast.ysmUnbound', { name: p.name }), 'ok')
                                 load()
                               } catch (err: any) {
-                                toast.show(err?.response?.data?.error?.message || err.message || '解除失败', 'err')
+                                toast.show(err?.response?.data?.error?.message || err.message || t('dashboard.toast.ysmUnbindFailed'), 'err')
                               }
                             }}
                           >
                             <Unlink size={13} strokeWidth={1.5} />
-                            解绑
+                            {t('dashboard.profile.actionUnbind')}
                           </TextLink>
                         </>
                       ) : null}
                       <TextLink danger onClick={() => deleteProfile(p)}>
                         <Trash2 size={13} strokeWidth={1.5} />
-                        删除
+                        {t('dashboard.profile.actionDelete')}
                       </TextLink>
                       </>
                     }
@@ -277,43 +276,43 @@ export default function Dashboard() {
 
       <Modal
         open={createOpen}
-        title="新建档案"
+        title={t('dashboard.modal.newProfile.title')}
         onClose={() => setCreateOpen(false)}
         footer={
           <>
             <Button variant="ghost" onClick={() => setCreateOpen(false)}>
-              取消
+              {t('dashboard.modal.newProfile.cancel')}
             </Button>
             <Button variant="primary" disabled={busy} onClick={createProfile}>
-              创建
+              {t('dashboard.modal.newProfile.confirm')}
             </Button>
           </>
         }
       >
-        <Field label="游戏名称" hint="3-16 位字母数字下划线">
+        <Field label={t('dashboard.modal.newProfile.fieldName')} hint={t('dashboard.modal.newProfile.fieldNameHint')}>
           <Input className="mono" value={name} onChange={(e) => setName(e.target.value)} placeholder="Steve" autoFocus />
         </Field>
       </Modal>
 
       <Modal
         open={!!renameTarget}
-        title="受控改名"
+        title={t('dashboard.modal.rename.title')}
         onClose={() => setRenameTarget(null)}
         footer={
           <>
             <Button variant="ghost" onClick={() => setRenameTarget(null)}>
-              取消
+              {t('dashboard.modal.rename.cancel')}
             </Button>
             <Button variant="primary" disabled={busy} onClick={renameProfile}>
-              保存
+              {t('dashboard.modal.rename.save')}
             </Button>
           </>
         }
       >
         <p className="data" style={{ margin: '0 0 16px', color: 'var(--text-3)' }}>
-          改名保留 UUID 与材质绑定，并使绑定该档案的 Yggdrasil token 失效。
+          {t('dashboard.modal.rename.description')}
         </p>
-        <Field label="新名称">
+        <Field label={t('dashboard.modal.rename.fieldName')}>
           <Input className="mono" value={name} onChange={(e) => setName(e.target.value)} placeholder="Notch" autoFocus />
         </Field>
       </Modal>

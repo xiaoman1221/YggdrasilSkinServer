@@ -4,16 +4,13 @@ import { authApi, LoginRecord } from '../api/auth'
 import { useToast } from '../components/Toast'
 import { Button, Modal, Pager, Panel, Spinner, Table, TextLink } from '../components/ui'
 import type { Column } from '../components/ui'
+import { useTranslation } from 'react-i18next'
 
 const PAGE_SIZE = 15
 
-const typeLabel: Record<string, string> = {
-  login: '启动器登录',
-  join: '进入服务器',
-}
-
 export default function LoginRecords() {
   const toast = useToast()
+  const { t } = useTranslation()
   const [records, setRecords] = useState<LoginRecord[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -28,7 +25,7 @@ export default function LoginRecords() {
         setRecords(res.records)
         setTotal(res.total)
       } catch (err: any) {
-        toast.show(err.message || '加载失败', 'err')
+        toast.show(err.message || t('loginRecords.toast.loadFailed'), 'err')
       } finally {
         setLoading(false)
       }
@@ -43,20 +40,20 @@ export default function LoginRecords() {
   const columns: Column<LoginRecord>[] = [
     {
       key: 'time',
-      title: '时间',
+      title: t('loginRecords.col.time'),
       width: 180,
       render: (r) => <span className="data">{new Date(r.created_at).toLocaleString()}</span>,
     },
     {
       key: 'profile',
-      title: '档案',
+      title: t('loginRecords.col.profile'),
       width: 160,
       render: (r) =>
         r.profile_name ? <span className="mono" style={{ color: 'var(--text)' }}>{r.profile_name}</span> : <span className="data">—</span>,
     },
     {
       key: 'ip',
-      title: 'IP',
+      title: t('loginRecords.col.ip'),
       render: (r) => <span className="data">{r.ip || '—'}</span>,
     },
     {
@@ -66,7 +63,7 @@ export default function LoginRecords() {
       render: (r) => (
         <TextLink onClick={() => setDetail(r)}>
           <Eye size={13} strokeWidth={1.5} />
-          详情
+          {t('loginRecords.col.detail')}
         </TextLink>
       ),
     },
@@ -75,15 +72,15 @@ export default function LoginRecords() {
   return (
     <div>
       <header className="page-head">
-        <h1 className="page-title">登录记录</h1>
-        <p className="page-sub">共 {total} 条 · 列表仅展示时间、档案与 IP，更多信息点击「详情」查看</p>
+        <h1 className="page-title">{t('loginRecords.title')}</h1>
+        <p className="page-sub">{t('loginRecords.totalPrefix')} {total} {t('loginRecords.totalSuffix')} {t('loginRecords.subtitle')}</p>
       </header>
 
-      <Panel title="我的登录记录">
+      <Panel title={t('loginRecords.panelTitle')}>
         {loading ? (
-          <Spinner label="加载记录" />
+          <Spinner label={t('loginRecords.loading')} />
         ) : records.length === 0 ? (
-          <div className="empty">暂无登录记录，通过 Yggdrasil 登录或进入服务器后会显示在这里</div>
+          <div className="empty">{t('loginRecords.empty')}</div>
         ) : (
           <>
             <Table columns={columns} data={records} />
@@ -94,31 +91,31 @@ export default function LoginRecords() {
 
       <Modal
         open={!!detail}
-        title="登录记录详情"
+        title={t('loginRecords.detail.title')}
         onClose={() => setDetail(null)}
         footer={
           <Button variant="ghost" onClick={() => setDetail(null)}>
-            关闭
+            {t('loginRecords.detail.close')}
           </Button>
         }
       >
         {detail ? (
           <dl className="kv">
-            <dt>记录类型</dt>
-            <dd>{typeLabel[detail.type || 'login'] || detail.type || '登录'}</dd>
-            <dt>时间</dt>
+            <dt>{t('loginRecords.detail.fieldType')}</dt>
+            <dd>{detail.type === 'join' ? t('loginRecords.type.join') : detail.type === 'login' ? t('loginRecords.type.login') : detail.type || t('loginRecords.detail.typeFallback')}</dd>
+            <dt>{t('loginRecords.detail.fieldTime')}</dt>
             <dd>{new Date(detail.created_at).toLocaleString()}</dd>
-            <dt>档案名称</dt>
+            <dt>{t('loginRecords.detail.fieldProfileName')}</dt>
             <dd>{detail.profile_name || '—'}</dd>
-            <dt>档案 UUID</dt>
+            <dt>{t('loginRecords.detail.fieldProfileUuid')}</dt>
             <dd className="mono" style={{ wordBreak: 'break-all' }}>{detail.profile_id || '—'}</dd>
-            <dt>IP 地址</dt>
+            <dt>{t('loginRecords.detail.fieldIp')}</dt>
             <dd>{detail.ip || '—'}</dd>
-            <dt>登录启动器</dt>
-            <dd>{detail.launcher || '未知'}</dd>
-            <dt>启动器版本</dt>
+            <dt>{t('loginRecords.detail.fieldLauncher')}</dt>
+            <dd>{detail.launcher || t('loginRecords.detail.launcherFallback')}</dd>
+            <dt>{t('loginRecords.detail.fieldLauncherVersion')}</dt>
             <dd>{detail.launcher_version || '—'}</dd>
-            <dt>记录 ID</dt>
+            <dt>{t('loginRecords.detail.fieldRecordId')}</dt>
             <dd className="mono">#{detail.id}</dd>
             <dt>User-Agent</dt>
             <dd style={{ wordBreak: 'break-all' }}>{detail.user_agent || '—'}</dd>

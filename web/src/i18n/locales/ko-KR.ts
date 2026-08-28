@@ -104,6 +104,7 @@ export default {
   },
   preview: {
     emptySkin: '스킨이 설정되지 않음',
+    alt: '스킨 미리보기', ariaLabel: '상호작용 가능한 3D 스킨 미리보기',
   },
   picker: {
     title: '프로필 선택',
@@ -482,6 +483,7 @@ export default {
       title: '인터페이스 언어',
       hint: '사이트 인터페이스 언어를 변경하면 선택이 저장됩니다.',
     },
+    theme: { title: '테마', hint: '밝게, 어둡게 또는 시스템 설정을 선택하세요. 선택이 저장됩니다.', light: '밝게', dark: '어둡게', auto: '시스템' },
   },
   library: {
     pageTitle: '공개 스킨 라이브러리',

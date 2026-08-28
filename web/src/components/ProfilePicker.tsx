@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { profileApi, Profile } from '../api/profile'
 import { Button, Modal, Spinner, StatusTag } from './ui'
 
@@ -7,7 +8,7 @@ import { Button, Modal, Spinner, StatusTag } from './ui'
  */
 export function ProfilePicker({
   open,
-  title = '选择档案',
+  title,
   onClose,
   onSelect,
 }: {
@@ -16,6 +17,7 @@ export function ProfilePicker({
   onClose: () => void
   onSelect: (profile: Profile) => void
 }) {
+  const { t } = useTranslation()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -30,11 +32,11 @@ export function ProfilePicker({
   }, [open])
 
   return (
-    <Modal open={open} title={title} onClose={onClose} footer={<Button variant="ghost" onClick={onClose}>取消</Button>}>
+    <Modal open={open} title={title ?? t('picker.title')} onClose={onClose} footer={<Button variant="ghost" onClick={onClose}>{t('picker.cancel')}</Button>}>
       {loading ? (
-        <Spinner label="加载档案" />
+        <Spinner label={t('picker.loading')} />
       ) : profiles.length === 0 ? (
-        <div className="empty">还没有档案，请先在控制台创建</div>
+        <div className="empty">{t('picker.empty')}</div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {profiles.map((p) => (
@@ -68,9 +70,9 @@ export function ProfilePicker({
             >
               <span className="mono" style={{ fontWeight: 600 }}>{p.name}</span>
               <span style={{ display: 'inline-flex', gap: 8 }}>
-                {p.skin_texture ? <StatusTag kind="on">皮肤</StatusTag> : null}
-                {p.cape_texture ? <StatusTag kind="on">披风</StatusTag> : null}
-                {p.ysm_model ? <StatusTag kind="warn">YSM</StatusTag> : null}
+                {p.skin_texture ? <StatusTag kind="on">{t('picker.tagSkin')}</StatusTag> : null}
+                {p.cape_texture ? <StatusTag kind="on">{t('picker.tagCape')}</StatusTag> : null}
+                {p.ysm_model ? <StatusTag kind="warn">{t('picker.tagYsm')}</StatusTag> : null}
               </span>
             </button>
           ))}

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { authApi } from '../api/auth'
 import { Button, Field, Input } from '../components/ui'
 import AuthAside from '../components/AuthAside'
 import { useToast } from '../components/Toast'
 
 export default function ForgotPassword() {
+  const { t } = useTranslation()
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -19,7 +21,7 @@ export default function ForgotPassword() {
       await authApi.forgotPassword(email.trim())
       setSent(true)
     } catch (err: any) {
-      toast.show(err?.message || '发送失败', 'err')
+      toast.show(err?.message || t('forgotPassword.toast.sendFailed'), 'err')
     } finally {
       setBusy(false)
     }
@@ -27,26 +29,26 @@ export default function ForgotPassword() {
 
   return (
     <div className="split-auth">
-      <AuthAside tagline="通过注册邮箱找回密码。" />
+      <AuthAside tagline={t('forgotPassword.tagline')} />
       <main className="auth-main">
         {sent ? (
           <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
             <div>
-              <h1>邮件已发送</h1>
-              <p className="hint">如果该邮箱已注册，你将收到一封包含重置链接的邮件（30 分钟内有效）。</p>
+              <h1>{t('forgotPassword.sent.title')}</h1>
+              <p className="hint">{t('forgotPassword.sent.hint')}</p>
             </div>
             <p className="auth-switch">
-              <Link to="/login">返回登录</Link>
+              <Link to="/login">{t('forgotPassword.link.backToLogin')}</Link>
             </p>
           </form>
         ) : (
           <form className="auth-form" onSubmit={onSubmit}>
             <div>
-              <h1>忘记密码</h1>
-              <p className="hint">输入注册邮箱，我们将发送重置链接</p>
+              <h1>{t('forgotPassword.title')}</h1>
+              <p className="hint">{t('forgotPassword.hint')}</p>
             </div>
             <div className="fields">
-              <Field label="注册邮箱">
+              <Field label={t('forgotPassword.field.email')}>
                 <Input
                   className="mono"
                   value={email}
@@ -56,11 +58,11 @@ export default function ForgotPassword() {
                 />
               </Field>
               <Button type="submit" variant="primary" size="lg" disabled={busy}>
-                {busy ? '发送中…' : '发送重置邮件'}
+                {busy ? t('forgotPassword.btn.sending') : t('forgotPassword.btn.send')}
               </Button>
             </div>
             <p className="auth-switch">
-              <Link to="/login">返回登录</Link>
+              <Link to="/login">{t('forgotPassword.link.backToLogin')}</Link>
             </p>
           </form>
         )}

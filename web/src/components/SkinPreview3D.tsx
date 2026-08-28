@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as skinview3d from 'skinview3d'
+import { useTranslation } from 'react-i18next'
 import stevePng from '../assets/steve.png'
 
 interface SkinPreview3DProps {
@@ -55,6 +56,7 @@ export default function SkinPreview3D({
   className = '',
   baseSkinUrl,
 }: SkinPreview3DProps) {
+  const { t } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const viewerRef = useRef<skinview3d.SkinViewer | null>(null)
   const [visible, setVisible] = useState(false)
@@ -159,7 +161,7 @@ export default function SkinPreview3D({
     return (
       <img
         src={fallback}
-        alt="皮肤预览"
+        alt={t('preview.alt')}
         className={`skin-preview ${className}`.trim()}
         style={{ width, height, objectFit: 'contain', imageRendering: 'pixelated', display: 'block' }}
       />
@@ -171,7 +173,7 @@ export default function SkinPreview3D({
       ref={canvasRef}
       className={`skin-preview ${className}`.trim()}
       style={{ width, height, display: 'block' }}
-      aria-label="3D 皮肤预览"
+      aria-label={t('preview.ariaLabel')}
     />
   )
 }

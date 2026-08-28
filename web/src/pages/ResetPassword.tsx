@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { authApi } from '../api/auth'
 import { Button, Field, Input } from '../components/ui'
 import AuthAside from '../components/AuthAside'
 import { useToast } from '../components/Toast'
 
 export default function ResetPassword() {
+  const { t } = useTranslation()
   const toast = useToast()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -18,15 +20,15 @@ export default function ResetPassword() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!token) {
-      toast.show('缺少重置令牌，请通过邮件中的链接进入', 'err')
+      toast.show(t('resetPassword.toast.missingToken'), 'err')
       return
     }
     if (password.length < 6) {
-      toast.show('密码至少 6 位', 'err')
+      toast.show(t('resetPassword.toast.passwordTooShort'), 'err')
       return
     }
     if (password !== confirm) {
-      toast.show('两次输入的密码不一致', 'err')
+      toast.show(t('resetPassword.toast.passwordMismatch'), 'err')
       return
     }
     setBusy(true)
@@ -35,7 +37,7 @@ export default function ResetPassword() {
       setDone(true)
       setTimeout(() => navigate('/login', { replace: true }), 2000)
     } catch (err: any) {
-      toast.show(err?.message || '重置失败', 'err')
+      toast.show(err?.message || t('resetPassword.toast.resetFailed'), 'err')
     } finally {
       setBusy(false)
     }
@@ -43,37 +45,37 @@ export default function ResetPassword() {
 
   return (
     <div className="split-auth">
-      <AuthAside tagline="设置新密码。" />
+      <AuthAside tagline={t('resetPassword.tagline')} />
       <main className="auth-main">
         {done ? (
           <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
             <div>
-              <h1>重置成功</h1>
-              <p className="hint">密码已更新，即将跳转到登录页……</p>
+              <h1>{t('resetPassword.done.title')}</h1>
+              <p className="hint">{t('resetPassword.done.hint')}</p>
             </div>
             <p className="auth-switch">
-              <Link to="/login">前往登录</Link>
+              <Link to="/login">{t('resetPassword.done.linkLogin')}</Link>
             </p>
           </form>
         ) : (
           <form className="auth-form" onSubmit={onSubmit}>
             <div>
-              <h1>重置密码</h1>
-              <p className="hint">{token ? '请输入新密码' : '缺少重置令牌'}</p>
+              <h1>{t('resetPassword.title')}</h1>
+              <p className="hint">{token ? t('resetPassword.hint.enterPassword') : t('resetPassword.hint.missingToken')}</p>
             </div>
             <div className="fields">
-              <Field label="新密码" hint="至少 6 位">
+              <Field label={t('resetPassword.field.newPassword')} hint={t('resetPassword.field.newPasswordHint')}>
                 <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus />
               </Field>
-              <Field label="确认新密码">
+              <Field label={t('resetPassword.field.confirmPassword')}>
                 <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
               </Field>
               <Button type="submit" variant="primary" size="lg" disabled={busy || !token}>
-                {busy ? '提交中…' : '重置密码'}
+                {busy ? t('resetPassword.btn.submitting') : t('resetPassword.btn.reset')}
               </Button>
             </div>
             <p className="auth-switch">
-              <Link to="/login">返回登录</Link>
+              <Link to="/login">{t('resetPassword.link.backToLogin')}</Link>
             </p>
           </form>
         )}

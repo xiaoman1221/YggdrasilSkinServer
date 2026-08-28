@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import SkinPreview3D from './SkinPreview3D'
 
 /**
@@ -24,6 +25,7 @@ export function PreviewCard({
   actions?: ReactNode
   emptyText?: string
 }) {
+  const { t } = useTranslation()
   return (
     <div className="pcard">
       <div className="pcard-stage">
@@ -35,7 +37,7 @@ export function PreviewCard({
           width={176}
           height={216}
         />
-        {!skinUrl ? <span className="pcard-empty">{emptyText || '未设置皮肤'}</span> : null}
+        {!skinUrl ? <span className="pcard-empty">{emptyText || t('preview.emptySkin')}</span> : null}
       </div>
       <div className="pcard-body">
         <div className="pcard-title">{title}</div>

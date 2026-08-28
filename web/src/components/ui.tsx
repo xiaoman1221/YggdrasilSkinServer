@@ -7,6 +7,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 /* ---------- 按钮 ---------- */
 
@@ -122,7 +123,7 @@ export interface Column<T> {
 export function Table<T>({
   columns,
   data,
-  empty = '暂无数据',
+  empty,
   className = '',
 }: {
   columns: Column<T>[]
@@ -130,8 +131,9 @@ export function Table<T>({
   empty?: string
   className?: string
 }) {
+  const { t } = useTranslation()
   if (data.length === 0) {
-    return <div className="empty">{empty}</div>
+    return <div className="empty">{empty ?? t('ui.tableEmpty')}</div>
   }
   return (
     <div className={`table-wrap ${className}`.trim()}>
@@ -187,8 +189,9 @@ export function TextLink({
 
 /* ---------- 空状态（虚线框，无插画） ---------- */
 
-export function Empty({ text = '暂无数据' }: { text?: string }) {
-  return <div className="empty">{text}</div>
+export function Empty({ text }: { text?: string }) {
+  const { t } = useTranslation()
+  return <div className="empty">{text ?? t('ui.emptyDefault')}</div>
 }
 
 /* ---------- 弹窗 ---------- */
@@ -208,6 +211,7 @@ export function Modal({
   footer?: ReactNode
   width?: number | string
 }) {
+  const { t } = useTranslation()
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -229,7 +233,7 @@ export function Modal({
       >
         <header className="modal-head">
           <h3 className="modal-title">{title}</h3>
-          <button type="button" className="modal-close" aria-label="关闭" onClick={onClose}>
+          <button type="button" className="modal-close" aria-label={t('ui.modalClose')} onClick={onClose}>
             <X size={18} strokeWidth={1.5} />
           </button>
         </header>
@@ -253,17 +257,18 @@ export function Pager({
   pageSize: number
   onChange: (p: number) => void
 }) {
+  const { t } = useTranslation()
   const pages = Math.max(1, Math.ceil(total / pageSize))
   return (
     <div className="pager">
       <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-        上一页
+        {t('ui.pagerPrev')}
       </Button>
       <span>
         {page} / {pages}
       </span>
       <Button size="sm" variant="ghost" disabled={page >= pages} onClick={() => onChange(page + 1)}>
-        下一页
+        {t('ui.pagerNext')}
       </Button>
     </div>
   )
@@ -271,10 +276,11 @@ export function Pager({
 
 /* ---------- 加载中（极简） ---------- */
 
-export function Spinner({ label = '加载中' }: { label?: string }) {
+export function Spinner({ label }: { label?: string }) {
+  const { t } = useTranslation()
   return (
     <div className="empty">
-      <span className="data">{label}…</span>
+      <span className="data">{label ?? t('ui.spinnerDefault')}…</span>
     </div>
   )
 }

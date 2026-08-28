@@ -5,11 +5,13 @@ import { LoginRecord } from '../api/auth'
 import { useToast } from '../components/Toast'
 import { Button, Pager, Panel, Spinner, Table, TextLink } from '../components/ui'
 import type { Column } from '../components/ui'
+import { useTranslation } from 'react-i18next'
 
 const PAGE_SIZE = 15
 
 export default function AdminRecords() {
   const toast = useToast()
+  const { t } = useTranslation()
   const [records, setRecords] = useState<LoginRecord[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -24,9 +26,9 @@ export default function AdminRecords() {
         const res = await adminApi.loginRecords({ limit: PAGE_SIZE, offset: (p - 1) * PAGE_SIZE })
         setRecords(res.records)
         setTotal(res.total)
-        setSelected(new Set()) // 翻页后清空选择
+        setSelected(new Set())
       } catch (err: any) {
-        toast.show(err.message || '加载失败', 'err')
+        toast.show(err.message || t('adminRecords.toast.loadFailed'), 'err')
       } finally {
         setLoading(false)
       }
@@ -55,26 +57,26 @@ export default function AdminRecords() {
   }
 
   async function removeRecord(r: LoginRecord) {
-    if (!window.confirm(`确认删除该条登录记录（用户 #${r.user_id} · ${new Date(r.created_at).toLocaleString()}）？`)) return
+    if (!window.confirm(t('adminRecords.confirm.deleteOne', { userId: r.user_id, time: new Date(r.created_at).toLocaleString() }))) return
     try {
       await adminApi.deleteLoginRecord(r.id)
-      toast.show('已删除', 'ok')
+      toast.show(t('adminRecords.toast.deleted'), 'ok')
       load(page)
     } catch (err: any) {
-      toast.show(err?.message || '删除失败', 'err')
+      toast.show(err?.message || t('adminRecords.toast.deleteFailed'), 'err')
     }
   }
 
   async function removeSelected() {
     if (selectedCount === 0 || batchBusy) return
-    if (!window.confirm(`确认批量删除选中的 ${selectedCount} 条登录记录？此操作不可撤销。`)) return
+    if (!window.confirm(t('adminRecords.confirm.deleteBatch', { count: selectedCount }))) return
     setBatchBusy(true)
     try {
       const res = await adminApi.batchDeleteLoginRecords([...selected])
-      toast.show(`已删除 ${res.deleted} 条记录`, 'ok')
+      toast.show(t('adminRecords.toast.batchDeleted', { count: res.deleted }), 'ok')
       load(page)
     } catch (err: any) {
-      toast.show(err?.message || '批量删除失败', 'err')
+      toast.show(err?.message || t('adminRecords.toast.batchDeleteFailed'), 'err')
     } finally {
       setBatchBusy(false)
     }
@@ -88,7 +90,7 @@ export default function AdminRecords() {
           type="checkbox"
           checked={allSelected}
           onChange={toggleAll}
-          aria-label="全选本页"
+          aria-label={t('adminRecords.col.selectAria')}
         />
       ),
       width: 44,
@@ -97,49 +99,49 @@ export default function AdminRecords() {
           type="checkbox"
           checked={selected.has(r.id)}
           onChange={() => toggleOne(r.id)}
-          aria-label={`选择记录 ${r.id}`}
+          aria-label={t('adminRecords.col.selectRowAria', { id: r.id })}
         />
       ),
     },
     {
       key: 'time',
-      title: '时间',
+      title: t('adminRecords.col.time'),
       width: 170,
       render: (r) => <span className="data">{new Date(r.created_at).toLocaleString()}</span>,
     },
     {
       key: 'type',
-      title: '类型',
+      title: t('adminRecords.col.type'),
       width: 90,
       render: (r) => (
-        <span className="tag on">{r.type === 'join' ? '进服' : r.type === 'login' ? '登录' : r.type || '登录'}</span>
+        <span className="tag on">{r.type === 'join' ? t('adminRecords.col.typeJoin') : r.type === 'login' ? t('adminRecords.col.typeLogin') : r.type || t('adminRecords.col.typeLogin')}</span>
       ),
     },
     {
       key: 'user',
-      title: '用户 ID',
+      title: t('adminRecords.col.userId'),
       width: 80,
       align: 'right',
       render: (r) => <span className="data">#{r.user_id}</span>,
     },
     {
       key: 'profile',
-      title: '档案',
+      title: t('adminRecords.col.profile'),
       width: 130,
       render: (r) =>
         r.profile_name ? <span className="mono" style={{ color: 'var(--text)' }}>{r.profile_name}</span> : <span className="data">—</span>,
     },
     {
       key: 'ip',
-      title: 'IP',
+      title: t('adminRecords.col.ip'),
       width: 150,
       render: (r) => <span className="data">{r.ip || '—'}</span>,
     },
     {
       key: 'launcher',
-      title: '启动器',
+      title: t('adminRecords.col.launcher'),
       width: 150,
-      render: (r) => <span className="tag on">{r.launcher || '未知'}</span>,
+      render: (r) => <span className="tag on">{r.launcher || t('adminRecords.col.launcherFallback')}</span>,
     },
     {
       key: 'ua',
@@ -152,13 +154,13 @@ export default function AdminRecords() {
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('adminRecords.col.actions'),
       width: 70,
       align: 'right',
       render: (r) => (
         <TextLink danger onClick={() => removeRecord(r)}>
           <Trash2 size={13} strokeWidth={1.5} />
-          删除
+          {t('adminRecords.col.delete')}
         </TextLink>
       ),
     },
@@ -168,22 +170,22 @@ export default function AdminRecords() {
     <div>
       <header className="page-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <h1 className="page-title">登录记录</h1>
-          <p className="page-sub">全部用户 · 共 {total} 条</p>
+          <h1 className="page-title">{t('adminRecords.title')}</h1>
+          <p className="page-sub">{t('adminRecords.headerAllUsers')} · {t('adminRecords.totalPrefix')} {total} {t('adminRecords.totalSuffix')}</p>
         </div>
         {selectedCount > 0 ? (
           <Button variant="danger" disabled={batchBusy} onClick={removeSelected}>
             <Trash2 size={15} strokeWidth={1.5} />
-            {batchBusy ? '删除中…' : `删除选中 (${selectedCount})`}
+            {batchBusy ? t('adminRecords.btnDeleting') : t('adminRecords.btnDeleteSelected', { count: selectedCount })}
           </Button>
         ) : null}
       </header>
 
-      <Panel title="全部登录记录">
+      <Panel title={t('adminRecords.panelTitle')}>
         {loading ? (
-          <Spinner label="加载记录" />
+          <Spinner label={t('adminRecords.loading')} />
         ) : records.length === 0 ? (
-          <div className="empty">暂无登录记录</div>
+          <div className="empty">{t('adminRecords.empty')}</div>
         ) : (
           <>
             <Table columns={columns} data={records} />

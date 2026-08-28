@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../stores/auth'
 import AuthAside from '../components/AuthAside'
 
@@ -9,6 +10,7 @@ import AuthAside from '../components/AuthAside'
  * fragment 不会发往服务器，读取后写入本地存储并进入控制台。
  */
 export default function OAuthCallback() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { refreshUser } = useAuth()
   const [error, setError] = useState('')
@@ -20,7 +22,7 @@ export default function OAuthCallback() {
     handled.current = true
     const params = new URLSearchParams(window.location.search)
     if (params.get('result') === 'fail') {
-      setError(params.get('message') || '第三方登录失败')
+      setError(params.get('message') || t('oauthCallback.error.oauthFailed'))
       return
     }
     if (params.get('result') === 'success' && params.get('action') === 'bind') {
@@ -31,25 +33,25 @@ export default function OAuthCallback() {
     const access = frag.get('access')
     const refresh = frag.get('refresh')
     if (!access || !refresh) {
-      setError('回调参数缺失')
+      setError(t('oauthCallback.error.paramsMissing'))
       return
     }
     localStorage.setItem('yss_access_token', access)
     localStorage.setItem('yss_refresh_token', refresh)
     refreshUser()
       .then(() => navigate('/', { replace: true }))
-      .catch(() => setError('登录态获取失败'))
-  }, [navigate, refreshUser])
+      .catch(() => setError(t('oauthCallback.error.tokenFailed')))
+  }, [navigate, refreshUser, t])
 
   return (
     <div className="split-auth">
-      <AuthAside tagline="第三方登录" />
+      <AuthAside tagline={t('oauthCallback.tagline')} />
       <main className="auth-main">
         <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
           {bound ? (
             <div>
-              <h1>绑定成功</h1>
-              <p className="hint">第三方账号已绑定到当前用户。</p>
+              <h1>{t('oauthCallback.bound.title')}</h1>
+              <p className="hint">{t('oauthCallback.bound.hint')}</p>
               <p className="auth-switch">
                 <a
                   href="#"
@@ -58,14 +60,14 @@ export default function OAuthCallback() {
                     navigate('/settings', { replace: true })
                   }}
                 >
-                  返回个人设置
+                  {t('oauthCallback.bound.linkSettings')}
                 </a>
               </p>
             </div>
           ) : error ? (
             <>
               <div>
-                <h1>登录失败</h1>
+                <h1>{t('oauthCallback.error.title')}</h1>
                 <p className="hint">{error}</p>
               </div>
               <p className="auth-switch">
@@ -76,14 +78,14 @@ export default function OAuthCallback() {
                     navigate('/login', { replace: true })
                   }}
                 >
-                  返回登录
+                  {t('oauthCallback.error.linkLogin')}
                 </a>
               </p>
             </>
           ) : (
             <div>
-              <h1>登录中…</h1>
-              <p className="hint">正在完成第三方登录</p>
+              <h1>{t('oauthCallback.loading.title')}</h1>
+              <p className="hint">{t('oauthCallback.loading.hint')}</p>
             </div>
           )}
         </form>

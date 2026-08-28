@@ -104,6 +104,7 @@ export default {
   },
   preview: {
     emptySkin: '未设置皮肤',
+    alt: '皮肤预览', ariaLabel: '可旋转的 3D 皮肤预览',
   },
   picker: {
     title: '选择档案',
@@ -482,6 +483,7 @@ export default {
       title: '界面语言',
       hint: '切换站点界面语言，将记住你的选择。',
     },
+    theme: { title: '主题', hint: '选择浅色、深色或跟随系统主题，选择会自动记住。', light: '浅色', dark: '深色', auto: '跟随系统' },
   },
   library: {
     pageTitle: '公共皮肤库',

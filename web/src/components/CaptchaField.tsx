@@ -1,4 +1,5 @@
 import { RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Field, Input } from './ui'
 
 export interface CaptchaValue {
@@ -16,22 +17,23 @@ export default function CaptchaField({
   onChange: (v: CaptchaValue) => void
   onRefresh: () => void
 }) {
+  const { t } = useTranslation()
   return (
-    <Field label="图形验证码" hint="点击图片可刷新">
+    <Field label={t('captcha.label')} hint={t('captcha.hint')}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
         <Input
           className="mono"
           value={value.code}
           onChange={(e) => onChange({ ...value, code: e.target.value })}
-          placeholder="输入图中字符"
+          placeholder={t('captcha.placeholder')}
           autoComplete="off"
           maxLength={8}
         />
         {value.image ? (
           <img
             src={value.image}
-            alt="验证码"
-            title="点击刷新"
+            alt={t('captcha.imageAlt')}
+            title={t('captcha.imageTitle')}
             onClick={onRefresh}
             style={{
               width: 110,
@@ -48,7 +50,7 @@ export default function CaptchaField({
             className="btn btn-ghost"
             style={{ width: 110, height: 42 }}
             onClick={onRefresh}
-            title="刷新验证码"
+            title={t('captcha.refreshTitle')}
           >
             <RefreshCw size={14} strokeWidth={1.5} />
           </button>

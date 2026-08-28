@@ -26,6 +26,8 @@ import { assetUrl } from '../utils/format'
 import { createPasskey } from '../lib/webauthn'
 import { useToast } from '../components/Toast'
 import { Button, Empty, Field, Input, Panel, Spinner, StatusTag } from '../components/ui'
+import ThemeSwitcher from '../components/ThemeSwitcher'
+import { useTranslation } from 'react-i18next'
 
 /** OauthGo 渠道 → 图标映射（未匹配时使用通用地球图标）。 */
 const providerIcons: Record<string, LucideIcon> = {
@@ -58,6 +60,7 @@ export default function Settings() {
   const { user, refreshUser, logout } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const [username, setUsername] = useState(user?.username || '')
   const [email, setEmail] = useState(user?.email || '')
@@ -135,7 +138,7 @@ export default function Settings() {
       const res = await authApi.oauthBindAuthorize(type)
       window.location.href = res.url
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '获取授权地址失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('settings.oauth.bindFail'), 'err')
     } finally {
       setOauthBusy(false)
     }
@@ -147,14 +150,14 @@ export default function Settings() {
 
   async function unbindOauth(oauthType: string) {
     if (!oauthType) return
-    if (!window.confirm(`确认解除「${providerName(oauthType)}」绑定？解除后将不能再用该渠道直接登录本站。`)) return
+    if (!window.confirm(t('settings.oauth.unbindConfirm', { name: providerName(oauthType) }))) return
     setOauthBusy(true)
     try {
       await authApi.oauthUnbind(oauthType)
       await refreshUser()
-      toast.show('已解除绑定', 'ok')
+      toast.show(t('settings.oauth.unbindOk'), 'ok')
     } catch (err: any) {
-      toast.show(err?.message || '解绑失败', 'err')
+      toast.show(err?.message || t('settings.oauth.unbindFail'), 'err')
     } finally {
       setOauthBusy(false)
     }
@@ -166,49 +169,49 @@ export default function Settings() {
       const { sessionId, options } = await authApi.passkeyRegisterBegin()
       const response = await createPasskey(options)
       await authApi.passkeyRegisterFinish(sessionId, response)
-      toast.show('通行密钥已添加', 'ok')
+      toast.show(t('settings.passkey.added'), 'ok')
       loadPasskeys()
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '注册失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('settings.passkey.registerFail'), 'err')
     } finally {
       setPasskeyBusy(false)
     }
   }
 
   async function removePasskey(p: PasskeyCredential) {
-    if (!window.confirm(`确认删除通行密钥「${p.name}」？删除后该设备将无法通过它登录。`)) return
+    if (!window.confirm(t('settings.passkey.deleteConfirm', { name: p.name }))) return
     try {
       await authApi.passkeyRemove(p.id)
-      toast.show('已删除', 'ok')
+      toast.show(t('settings.passkey.deleted'), 'ok')
       loadPasskeys()
     } catch (err: any) {
-      toast.show(err?.message || '删除失败', 'err')
+      toast.show(err?.message || t('settings.passkey.deleteFail'), 'err')
     }
   }
 
   async function revoke(s: SessionInfo) {
     if (s.current) {
-      toast.show('当前会话不可下线，请使用「退出登录」', 'err')
+      toast.show(t('settings.sessions.revokeCurrentError'), 'err')
       return
     }
     try {
       await authApi.revokeSession(s.id)
-      toast.show('已下线该设备', 'ok')
+      toast.show(t('settings.sessions.revokeOk'), 'ok')
       loadSessions()
     } catch (err: any) {
-      toast.show(err?.message || '操作失败', 'err')
+      toast.show(err?.message || t('settings.sessions.revokeFail'), 'err')
     }
   }
 
   async function revokeOthers() {
-    if (!window.confirm('确认下线其他所有设备？当前设备将保留登录。')) return
+    if (!window.confirm(t('settings.sessions.revokeAllConfirm'))) return
     setSessionsBusy(true)
     try {
       await authApi.revokeOtherSessions(refreshToken)
-      toast.show('已下线其他设备', 'ok')
+      toast.show(t('settings.sessions.revokeAllOk'), 'ok')
       loadSessions()
     } catch (err: any) {
-      toast.show(err?.message || '操作失败', 'err')
+      toast.show(err?.message || t('settings.sessions.revokeFail'), 'err')
     } finally {
       setSessionsBusy(false)
     }
@@ -218,16 +221,16 @@ export default function Settings() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      toast.show('请选择图片文件', 'err')
+      toast.show(t('settings.avatar.selectImage'), 'err')
       return
     }
     setAvatarBusy(true)
     try {
       await authApi.uploadAvatar(file)
       await refreshUser()
-      toast.show('头像已更新', 'ok')
+      toast.show(t('settings.avatar.updated'), 'ok')
     } catch (err: any) {
-      toast.show(err?.response?.data?.error?.message || err.message || '上传失败', 'err')
+      toast.show(err?.response?.data?.error?.message || err.message || t('settings.avatar.uploadFail'), 'err')
     } finally {
       setAvatarBusy(false)
       e.target.value = ''
@@ -240,9 +243,9 @@ export default function Settings() {
     try {
       await authApi.updateProfile({ username: username.trim(), email: email.trim() })
       await refreshUser()
-      toast.show('基本信息已保存', 'ok')
+      toast.show(t('settings.profile.saved'), 'ok')
     } catch (err: any) {
-      toast.show(err?.message || '保存失败', 'err')
+      toast.show(err?.message || t('settings.profile.saveFail'), 'err')
     } finally {
       setProfileBusy(false)
     }
@@ -251,25 +254,25 @@ export default function Settings() {
   async function savePassword() {
     if (pwdBusy) return
     if (!current || !next) {
-      toast.show('请填写原密码与新密码', 'err')
+      toast.show(t('settings.password.validation.bothRequired'), 'err')
       return
     }
     if (next.length < 6) {
-      toast.show('新密码至少 6 位', 'err')
+      toast.show(t('settings.password.validation.minLength'), 'err')
       return
     }
     if (next !== confirm) {
-      toast.show('两次输入的新密码不一致', 'err')
+      toast.show(t('settings.password.validation.mismatch'), 'err')
       return
     }
     setPwdBusy(true)
     try {
       await authApi.changePassword({ current, new: next })
-      toast.show('密码已修改，请重新登录', 'ok')
+      toast.show(t('settings.password.changed'), 'ok')
       await logout()
       navigate('/login', { replace: true })
     } catch (err: any) {
-      toast.show(err?.message || '修改失败', 'err')
+      toast.show(err?.message || t('settings.password.fail'), 'err')
     } finally {
       setPwdBusy(false)
     }
@@ -278,9 +281,16 @@ export default function Settings() {
   return (
     <div style={{ maxWidth: 720, display: 'grid', gap: 20 }}>
       <header className="page-head">
-        <h1 className="page-title">个人设置</h1>
-        <p className="page-sub">UID #{user?.id}{user?.oauth_type ? ` · ${user.oauth_type} 登录` : ''}</p>
+        <h1 className="page-title">{t('settings.pageTitle')}</h1>
+        <p className="page-sub">UID #{user?.id}{user?.oauth_type ? t('settings.loginType', { type: user.oauth_type }) : ''}</p>
       </header>
+
+      <Panel title={t('settings.theme.title')}>
+        <div className="panel-body" style={{ display: 'grid', gap: 8 }}>
+          <ThemeSwitcher />
+          <p className="hint" style={{ margin: 0 }}>{t('settings.theme.hint')}</p>
+        </div>
+      </Panel>
 
       <Panel title="基本信息">
         <div className="panel-body">
